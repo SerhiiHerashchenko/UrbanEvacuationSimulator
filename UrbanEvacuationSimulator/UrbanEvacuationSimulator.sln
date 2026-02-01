@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrbanEvacuationSimulator", "UrbanEvacuationSimulator\UrbanEvacuationSimulator.csproj", "{FAE85284-6E94-4F77-A739-1497BF87281F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrbanEvacuationSimulator.Common", "UrbanEvacuationSimulator.Common\UrbanEvacuationSimulator.Common.csproj", "{2D4B67E8-5454-4BDB-8523-905DC517B56F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrbanEvacuationSimulator.GraphStructure", "UrbanEvacuationSimulator.GraphStructure\UrbanEvacuationSimulator.GraphStructure.csproj", "{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FAE85284-6E94-4F77-A739-1497BF87281F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FAE85284-6E94-4F77-A739-1497BF87281F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FAE85284-6E94-4F77-A739-1497BF87281F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FAE85284-6E94-4F77-A739-1497BF87281F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2D4B67E8-5454-4BDB-8523-905DC517B56F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2D4B67E8-5454-4BDB-8523-905DC517B56F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D4B67E8-5454-4BDB-8523-905DC517B56F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2D4B67E8-5454-4BDB-8523-905DC517B56F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
