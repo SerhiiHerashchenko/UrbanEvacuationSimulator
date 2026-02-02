@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrbanEvacuationSimulator.Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrbanEvacuationSimulator.GraphStructure", "UrbanEvacuationSimulator.GraphStructure\UrbanEvacuationSimulator.GraphStructure.csproj", "{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UrbanEvacuationSimulator.AgentStructure", "UrbanEvacuationSimulator.AgentStructure\UrbanEvacuationSimulator.AgentStructure.csproj", "{DFAF6CB9-84FB-471B-B952-B5ED282910AE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D7E2392-0A5A-4468-91D8-D980DC7E22F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DFAF6CB9-84FB-471B-B952-B5ED282910AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFAF6CB9-84FB-471B-B952-B5ED282910AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DFAF6CB9-84FB-471B-B952-B5ED282910AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DFAF6CB9-84FB-471B-B952-B5ED282910AE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
