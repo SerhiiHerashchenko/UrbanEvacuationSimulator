@@ -46,10 +46,20 @@ public class Graph
             double capacity = edgeDto.Lanes ?? 1.0;
             double length = sourceNode.GetDistance(targetNode);
 
-            var edge = new Edge(edgeDto.Id, sourceNode, targetNode, length, capacity);
-            edges.Add(edge);
-            
-            adjacencyList[sourceNode.Id].Add(edge);
+            var forwardEdge = new Edge(edgeDto.Id, sourceNode, targetNode, length, capacity);
+            edges.Add(forwardEdge);
+            adjacencyList[sourceNode.Id].Add(forwardEdge);
+
+            bool isOneWay = edgeDto.Tags != null && 
+                            edgeDto.Tags.TryGetValue("oneway", out var onewayValue) && 
+                            (onewayValue == "yes" || onewayValue == "true" || onewayValue == "1");
+
+            if (!isOneWay)
+            {
+                var reverseEdge = new Edge(-edgeDto.Id, targetNode, sourceNode, length, capacity);
+                edges.Add(reverseEdge);
+                adjacencyList[targetNode.Id].Add(reverseEdge);
+            }
         }
 
         return new Graph(nodes, edges, adjacencyList);

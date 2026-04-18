@@ -6,15 +6,9 @@ namespace UrbanEvacuationSimulator.Core.PathFinder;
 
 public class AStarPathFinder : IPathFinder
 {
-    public IReadOnlyList<Edge> FindPath(
-        Graph graph,
-        Node start,
-        Node target,
-        Func<Node, Node, double> heuristic)
+    public IReadOnlyList<Edge> FindPath(Graph graph, Node start, Node target, Func<Node, Node, double> heuristic)
     {
         var openSet = new PriorityQueue<Node, double>();
-        var openSetHashes = new HashSet<int>();
-        
         var cameFrom = new Dictionary<int, Edge>();
         var gScore = new Dictionary<int, double>();
         
@@ -24,15 +18,11 @@ public class AStarPathFinder : IPathFinder
         }
 
         gScore[start.Id] = 0;
-        double initialHeuristic = heuristic(start, target);
-        
-        openSet.Enqueue(start, initialHeuristic);
-        openSetHashes.Add(start.Id);
+        openSet.Enqueue(start, heuristic(start, target));
 
         while (openSet.Count > 0)
         {
             var current = openSet.Dequeue();
-            openSetHashes.Remove(current.Id);
 
             if (current.Id == target.Id)
             {
@@ -55,11 +45,8 @@ public class AStarPathFinder : IPathFinder
                     gScore[neighbor.Id] = tentativeGScore;
                     
                     double fScore = tentativeGScore + heuristic(neighbor, target);
-
-                    if (openSetHashes.Add(neighbor.Id))
-                    {
-                        openSet.Enqueue(neighbor, fScore);
-                    }
+                    
+                    openSet.Enqueue(neighbor, fScore);
                 }
             }
         }
