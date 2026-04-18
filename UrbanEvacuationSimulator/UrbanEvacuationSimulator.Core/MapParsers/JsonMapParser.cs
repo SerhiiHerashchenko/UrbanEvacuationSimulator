@@ -1,37 +1,45 @@
-﻿using UrbanEvacuationSimulator.Core.Interfaces;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using UrbanEvacuationSimulator.Core.DTOs;
+using UrbanEvacuationSimulator.Core.Interfaces;
 
 namespace UrbanEvacuationSimulator.Core.MapParsers;
 
 public class JsonMapParser : IMapParser
-{   
-    /// <summary>
-    /// Try to parse JSON file with graph edges.
-    /// </summary>
-    /// <param name="filename">path to JSON file.</param>
-    /// <param name="edges">Parsing result. Empty list if failed.</param>
-    /// <returns>True, if success, otherwise False.</returns>
-    public bool TryParse(string filename, out IReadOnlyList<OsmEdgeDto> edges)
+{
+    public bool TryParse(string filePath, out IReadOnlyList<OsmEdgeDto> edges)
     {
-        edges = Array.Empty<OsmEdgeDto>();
+        edges = new List<OsmEdgeDto>();
+
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"Map file not found: {filePath}");
+            return false;
+        }
 
         try
         {
-            if (!File.Exists(filename))
-            {
-                return false;
-            }
-            
+            var jsonString = File.ReadAllText(filePath);
+
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
-            
-            using FileStream stream = File.OpenRead(filename);
-            
-            var parsedEdges = JsonSerializer.Deserialize<List<OsmEdgeDto>>(stream, options);
+
+            using var document = JsonDocument.Parse(jsonString);
+            var root = document.RootElement;
+
+            if (!root.TryGetProperty("roads", out var roadsArray))
+            {
+                Console.WriteLine("JSON Parse Error: Root object does not contain a 'roads' array.");
+                return false;
+            }
+
+            var parsedEdges = roadsArray.Deserialize<List<OsmEdgeDto>>(options);
 
             if (parsedEdges != null)
             {
@@ -41,12 +49,15 @@ public class JsonMapParser : IMapParser
 
             return false;
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            Console.WriteLine($"[JSON Parsing Error]: {ex.Message}");
+            Console.WriteLine($"Failed at Path: {ex.Path} | Line: {ex.LineNumber}");
             return false;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"[System Error]: {ex.Message}");
             return false;
         }
     }

@@ -1,3 +1,12 @@
-﻿namespace UrbanEvacuationSimulator.Core.DTOs;
+﻿using System.Text.Json.Serialization;
 
-public record OsmNodeDto(double Lat, double Lon);
+namespace UrbanEvacuationSimulator.Core.DTOs;
+
+public class OsmNodeDto
+{
+    [JsonPropertyName("lat")]
+    public double Lat { get; set; }
+
+    [JsonPropertyName("lon")]
+    public double Lon { get; set; }
+}

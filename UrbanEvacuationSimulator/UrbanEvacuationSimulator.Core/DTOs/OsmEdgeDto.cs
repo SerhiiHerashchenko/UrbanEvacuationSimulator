@@ -1,12 +1,37 @@
-﻿namespace UrbanEvacuationSimulator.Core.DTOs;
+﻿// \UrbanEvacuationSimulator.Core\DTOs\OsmEdgeDto.cs
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text.Json.Serialization;
 
-public record OsmEdgeDto()
+namespace UrbanEvacuationSimulator.Core.DTOs;
+
+public class OsmEdgeDto
 {
-    public int Id { get; init; }
-    public OsmNodeDto Start { get; init; }
-    public OsmNodeDto End { get; init; }
-    public string Highway { get; init; }
-    public string Surface { get; init; }
-    public int? Lanes { get; init; }
-    public int? MaxSpeed { get; init; }
+    [JsonPropertyName("osm_id")]
+    public int Id { get; set; }
+
+    [JsonPropertyName("start_point")]
+    public OsmNodeDto Start { get; set; }
+
+    [JsonPropertyName("end_point")]
+    public OsmNodeDto End { get; set; }
+
+    [JsonPropertyName("tags")]
+    public Dictionary<string, string> Tags { get; set; }
+
+    [JsonIgnore]
+    public double? Lanes 
+    {
+        get 
+        {
+            if (Tags != null && Tags.TryGetValue("lanes", out var lanesStr))
+            {
+                if (double.TryParse(lanesStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var lanes))
+                {
+                    return lanes;
+                }
+            }
+            return null;
+        }
+    }
 }
