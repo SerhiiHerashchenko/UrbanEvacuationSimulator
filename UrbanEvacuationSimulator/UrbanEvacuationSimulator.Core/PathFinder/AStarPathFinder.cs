@@ -11,11 +11,6 @@ public class AStarPathFinder : IPathFinder
         var openSet = new PriorityQueue<Node, double>();
         var cameFrom = new Dictionary<int, Edge>();
         var gScore = new Dictionary<int, double>();
-        
-        foreach (var node in graph.Nodes)
-        {
-            gScore[node.Id] = double.PositiveInfinity;
-        }
 
         gScore[start.Id] = 0;
         openSet.Enqueue(start, heuristic(start, target));
@@ -28,7 +23,7 @@ public class AStarPathFinder : IPathFinder
             {
                 return ReconstructPath(cameFrom, current);
             }
-            
+
             var neighbors = graph.AdjacencyList[current.Id];
             if (neighbors == null)
             {
@@ -38,20 +33,20 @@ public class AStarPathFinder : IPathFinder
             foreach (var edge in neighbors)
             {
                 var neighbor = edge.Target;
-                var tentativeGScore = gScore[current.Id] + edge.CurrentWeight;
+                
+                double currentGScore = gScore.TryGetValue(current.Id, out var cg) ? cg : double.PositiveInfinity;
+                double tentativeGScore = currentGScore + edge.CurrentWeight;
 
-                if (tentativeGScore < gScore[neighbor.Id])
+                double neighborGScore = gScore.TryGetValue(neighbor.Id, out var ng) ? ng : double.PositiveInfinity;
+
+                if (tentativeGScore < neighborGScore)
                 {
                     cameFrom[neighbor.Id] = edge;
                     gScore[neighbor.Id] = tentativeGScore;
-                    
-                    double fScore = tentativeGScore + heuristic(neighbor, target);
-                    
-                    openSet.Enqueue(neighbor, fScore);
+                    openSet.Enqueue(neighbor, tentativeGScore + heuristic(neighbor, target));
                 }
             }
         }
-
         return Array.Empty<Edge>();
     }
 
