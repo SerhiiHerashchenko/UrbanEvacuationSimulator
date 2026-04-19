@@ -30,7 +30,8 @@ public class JsonMapParser : IMapParser
                 NumberHandling = JsonNumberHandling.AllowReadingFromString
             };
 
-            using var document = JsonDocument.Parse(jsonString);
+            using var stream = File.OpenRead(filePath);
+            using var document = JsonDocument.Parse(stream);
             var root = document.RootElement;
 
             if (!root.TryGetProperty("roads", out var roadsArray))
