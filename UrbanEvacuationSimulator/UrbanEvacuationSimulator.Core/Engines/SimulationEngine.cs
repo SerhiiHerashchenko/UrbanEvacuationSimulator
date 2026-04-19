@@ -12,6 +12,7 @@ public class SimulationEngine : ISimulationEngine
     private readonly IReadOnlyList<Agent.Agent> _agents;
     private readonly IPathFinder _pathFinder;
     private readonly Func<Node, Node, double> _heuristic;
+    private readonly List<Agent.Agent> _activeAgents;
     
     public int CurrentTick { get; private set; }
 
@@ -21,6 +22,7 @@ public class SimulationEngine : ISimulationEngine
         _agents = agents;
         _pathFinder = pathFinder;
         _heuristic = (start, target) => start.GetDistance(target);
+        _activeAgents = agents.ToList();
         CurrentTick = 0;
     }
 
@@ -28,8 +30,10 @@ public class SimulationEngine : ISimulationEngine
     {
         CurrentTick++;
 
-        foreach (var agent in _agents.Where(a => a.State == AgentState.Idle || a.State == AgentState.Moving || a.State == AgentState.PathNotFound))
+        for (int i = _activeAgents.Count - 1; i >= 0; i--)
         {
+            var agent = _activeAgents[i];
+
             if (agent.State == AgentState.Idle && agent.CurrentPath.Count == 0)
             {
                 var path = _pathFinder.FindPath(_graph, agent.CurrentNode, agent.TargetNode, _heuristic);
@@ -80,6 +84,13 @@ public class SimulationEngine : ISimulationEngine
                         }
                     }
                 }
+            }
+
+            if (agent.State == AgentState.Evacuated || 
+                agent.State == AgentState.DeadVehicle || 
+                agent.State == AgentState.PathNotFound)
+            {
+                _activeAgents.RemoveAt(i);
             }
         }
     }
