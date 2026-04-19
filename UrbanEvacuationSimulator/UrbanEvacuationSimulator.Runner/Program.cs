@@ -67,14 +67,15 @@ public class Program
         var agents = new List<Agent>();
         var random = new Random(42); // Fixed seed for reproducibility
 
+        var targetNode = graph.Nodes[random.Next(graph.Nodes.Count)];
+
         for (int i = 1; i <= count; i++)
         {
             var startNode = graph.Nodes[random.Next(graph.Nodes.Count)];
-            var targetNode = graph.Nodes[random.Next(graph.Nodes.Count)];
             
             while (startNode.Id == targetNode.Id)
             {
-                targetNode = graph.Nodes[random.Next(graph.Nodes.Count)];
+                startNode = graph.Nodes[random.Next(graph.Nodes.Count)];
             }
             
             // Randomize fuel (meters) and speed (m/tick)
@@ -91,6 +92,7 @@ public class Program
     {
         int evacuated = agents.Count(a => a.State == AgentState.Evacuated);
         int deadVehicles = agents.Count(a => a.State == AgentState.DeadVehicle);
+        int pathfindingFailures = agents.Count(a => a.State == AgentState.PathNotFound);
         double survivalRate = (double)evacuated / agents.Count * 100;
 
         Console.WriteLine("\n--- SIMULATION RESULTS ---");
@@ -98,6 +100,7 @@ public class Program
         Console.WriteLine($"Total Agents:         {agents.Count}");
         Console.WriteLine($"Evacuated:            {evacuated}");
         Console.WriteLine($"Dead Vehicles:        {deadVehicles}");
+        Console.WriteLine($"Pathfinding Failures: {pathfindingFailures}");
         Console.WriteLine($"S_rate (Survival %):  {survivalRate:F2}%");
         Console.WriteLine("--------------------------");
     }
