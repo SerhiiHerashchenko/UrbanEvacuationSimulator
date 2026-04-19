@@ -28,8 +28,9 @@ public class AStarPathFinder : IPathFinder
             {
                 return ReconstructPath(cameFrom, current);
             }
-
-            if (!graph.AdjacencyList.TryGetValue(current.Id, out var neighbors))
+            
+            var neighbors = graph.AdjacencyList[current.Id];
+            if (neighbors == null)
             {
                 continue;
             }
