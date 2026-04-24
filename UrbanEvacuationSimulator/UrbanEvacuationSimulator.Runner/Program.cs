@@ -1,7 +1,11 @@
-﻿using UrbanEvacuationSimulator.Core.Agent;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using UrbanEvacuationSimulator.Core.Agent;
 using UrbanEvacuationSimulator.Core.Engines;
 using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.GraphStructures;
+using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
 using UrbanEvacuationSimulator.Core.MapParsers;
 using UrbanEvacuationSimulator.Core.PathFinder;
 
@@ -16,16 +20,16 @@ public class Program
         string mapFilePath = args.Length > 0 ? args[0] : "map.json";
         
         var mapParser = new JsonMapParser();
-        if (!mapParser.TryParse(mapFilePath, out var edgeDtos))
+        if (!mapParser.TryParse(mapFilePath, out var responseDto))
         {
             Console.WriteLine($"Failed to parse map file: {mapFilePath}");
             Console.WriteLine("Ensure the JSON map file exists and is correctly formatted.");
             return;
         }
 
-        Console.WriteLine($"Map parsed successfully. Loaded {edgeDtos.Count} edges.");
+        Console.WriteLine($"Map parsed successfully. Loaded {responseDto.Elements.Count} elements.");
 
-        var graph = Graph.CreateGraph(edgeDtos);
+        var graph = Graph.CreateGraph(responseDto);
         Console.WriteLine($"Graph built: {graph.Nodes.Count} nodes, {graph.Edges.Count} edges.");
 
         if (graph.Nodes.Count < 2)
@@ -35,7 +39,7 @@ public class Program
         }
 
         // Initialize simulation components
-        var agents = GenerateAgents(graph, count: 1);
+        var agents = GenerateAgents(graph, count: 10000);
         var pathFinder = new AStarPathFinder();
         var engine = new SimulationEngine(graph, agents, pathFinder);
 
@@ -72,7 +76,7 @@ public class Program
         for (int i = 1; i <= count; i++)
         {
             var startNode = graph.Nodes[random.Next(graph.Nodes.Count)];
-            
+
             while (startNode.Id == targetNode.Id)
             {
                 startNode = graph.Nodes[random.Next(graph.Nodes.Count)];

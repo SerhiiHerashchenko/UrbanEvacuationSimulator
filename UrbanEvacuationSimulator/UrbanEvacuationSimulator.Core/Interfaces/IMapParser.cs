@@ -4,5 +4,5 @@ namespace UrbanEvacuationSimulator.Core.Interfaces;
 
 public interface IMapParser
 {
-    bool TryParse(string filename, out IReadOnlyList<OsmEdgeDto> edges);
+    public bool TryParse(string filePath, out OverpassResponseDto responseDto);
 }

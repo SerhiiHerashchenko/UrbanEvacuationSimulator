@@ -1,4 +1,7 @@
-﻿using UrbanEvacuationSimulator.Core.DTOs;
+﻿using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using UrbanEvacuationSimulator.Core.DTOs;
 using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
 
 namespace UrbanEvacuationSimulator.Core.GraphStructures;
@@ -9,59 +12,74 @@ public class Graph
     public IReadOnlyList<Edge> Edges { get; }
     public List<List<Edge>> AdjacencyList { get; }
 
-    private Graph(List<Node> nodes, List<Edge> edges, List<List<Edge>> adjacencyList)
+    public Graph(IReadOnlyList<Node> nodes, IReadOnlyList<Edge> edges, List<List<Edge>> adjacencyList)
     {
-        Nodes = nodes.AsReadOnly();
-        Edges = edges.AsReadOnly();
+        Nodes = nodes;
+        Edges = edges;
         AdjacencyList = adjacencyList;
     }
-    
-    public static Graph CreateGraph(IReadOnlyList<OsmEdgeDto> edgesDto)
+
+    public static Graph CreateGraph(OverpassResponseDto data)
     {
-        var nodeMap = new Dictionary<(double Lat, double Lon), Node>();
-        var nodes = new List<Node>();
+        var nodeMap = new Dictionary<long, Node>();
         var edges = new List<Edge>();
         var adjacencyList = new List<List<Edge>>();
 
-        int nodeIdCounter = 0;
+        int internalNodeId = 0;
+        int edgeIdCounter = 0;
 
-        Node GetOrAddNode(OsmNodeDto dto)
+        foreach (var el in data.Elements.Where(e => e.Type == "node"))
         {
-            var key = (dto.Lat, dto.Lon);
-            if (!nodeMap.TryGetValue(key, out var node))
+            if (el.Lat.HasValue && el.Lon.HasValue)
             {
-                node = new Node(nodeIdCounter++, dto.Lat, dto.Lon);
-                nodeMap[key] = node;
-                nodes.Add(node);
+                var node = new Node(internalNodeId++, el.Lat.Value, el.Lon.Value);
+                nodeMap[el.Id] = node;
                 adjacencyList.Add(new List<Edge>());
             }
-            return node;
         }
 
-        foreach (var edgeDto in edgesDto)
+        foreach (var way in data.Elements.Where(e => e.Type == "way"))
         {
-            var sourceNode = GetOrAddNode(edgeDto.Start);
-            var targetNode = GetOrAddNode(edgeDto.End);
+            if (way.Nodes == null || way.Nodes.Count < 2) continue;
 
-            double capacity = edgeDto.Lanes ?? 1.0;
-            double length = sourceNode.GetDistance(targetNode);
+            double capacity = 1.0;
+            if (way.Tags != null && way.Tags.TryGetValue("lanes", out var lanesStr))
+            {
+                double.TryParse(lanesStr, NumberStyles.Any, CultureInfo.InvariantCulture, out capacity);
+            }
 
-            var forwardEdge = new Edge(edgeDto.Id, sourceNode, targetNode, length, capacity);
-            edges.Add(forwardEdge);
-            adjacencyList[sourceNode.Id].Add(forwardEdge);
-
-            bool isOneWay = edgeDto.Tags != null && 
-                            edgeDto.Tags.TryGetValue("oneway", out var onewayValue) && 
+            bool isOneWay = way.Tags != null && 
+                            way.Tags.TryGetValue("oneway", out var onewayValue) && 
                             (onewayValue == "yes" || onewayValue == "true" || onewayValue == "1");
 
-            if (!isOneWay)
+            for (int i = 0; i < way.Nodes.Count - 1; i++)
             {
-                var reverseEdge = new Edge(-edgeDto.Id, targetNode, sourceNode, length, capacity);
-                edges.Add(reverseEdge);
-                adjacencyList[targetNode.Id].Add(reverseEdge);
+                long osmSourceId = way.Nodes[i];
+                long osmTargetId = way.Nodes[i + 1];
+
+                if (!nodeMap.TryGetValue(osmSourceId, out var sourceNode) || 
+                    !nodeMap.TryGetValue(osmTargetId, out var targetNode))
+                {
+                    continue;
+                }
+
+                double length = sourceNode.GetDistance(targetNode);
+
+                var forwardEdge = new Edge(edgeIdCounter++, sourceNode, targetNode, length, capacity);
+                edges.Add(forwardEdge);
+                adjacencyList[sourceNode.Id].Add(forwardEdge);
+
+                if (!isOneWay)
+                {
+                    var reverseEdge = new Edge(edgeIdCounter++, targetNode, sourceNode, length, capacity);
+                    edges.Add(reverseEdge);
+                    adjacencyList[targetNode.Id].Add(reverseEdge);
+                }
             }
         }
 
-        return new Graph(nodes, edges, adjacencyList);
+        var connectedNodes = nodeMap.Values.Where(n => adjacencyList[n.Id].Count > 0).ToList();
+
+        return new Graph(connectedNodes, edges, adjacencyList);
     }
 }
