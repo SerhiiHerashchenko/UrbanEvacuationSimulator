@@ -18,6 +18,9 @@ public class Agent
     public Edge? CurrentEdge { get; set; }
     public double DistanceOnCurrentEdge { get; set; }
 
+    public double TotalPassedDistance { get; set; }
+    public int TotalNodesPassed { get; set; }
+
     public Agent(int id, Node startNode, Node targetNode, double fuel, double speed)
     {
         Id = id;
@@ -25,5 +28,7 @@ public class Agent
         TargetNode = targetNode;
         Fuel = fuel;
         Speed = speed;
+        TotalPassedDistance = 0;
+        TotalNodesPassed = 0;
     }
 }

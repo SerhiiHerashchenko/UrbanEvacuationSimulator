@@ -1,9 +1,29 @@
-﻿namespace UrbanEvacuationSimulator.Core.Metrics;
+﻿using UrbanEvacuationSimulator.Core.Enums;
+using UrbanEvacuationSimulator.Core.Interfaces;
 
-public class MetricsCollector
+namespace UrbanEvacuationSimulator.Core.Metrics;
+
+public class MetricsCollector: IMetricsCollector
 {
-    public void Collect()
+    private readonly Dictionary<MetricType, double> _metrics = new();
+
+    public void Collect(MetricType metricType, double value)
     {
-        throw new NotImplementedException();
+        _metrics[metricType] = value;
+    }
+
+    public double GetMetric(MetricType metricType)
+    {
+        return _metrics.TryGetValue(metricType, out var value) ? value : 0;
+    }
+
+    public void PrintMetricsToConsole()
+    {
+        Console.WriteLine("----- Simulation Metrics -----");
+        foreach (var metric in _metrics)
+        {
+            Console.WriteLine($"{metric.Key}: {metric.Value}");
+        }
+        Console.WriteLine("------------------------------");
     }
 }

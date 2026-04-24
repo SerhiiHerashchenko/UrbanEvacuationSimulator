@@ -54,6 +54,7 @@ public class SimulationEngine : ISimulationEngine
                 if (agent.CurrentEdge == null && agent.CurrentPath.Count > 0)
                 {
                     agent.CurrentEdge = agent.CurrentPath.Dequeue();
+                    agent.TotalNodesPassed++;
                     agent.DistanceOnCurrentEdge = 0;
                 }
 
@@ -61,6 +62,7 @@ public class SimulationEngine : ISimulationEngine
                 {
                     double moveDistance = agent.Speed;
                     agent.DistanceOnCurrentEdge += moveDistance;
+                    agent.TotalPassedDistance += agent.DistanceOnCurrentEdge;
                     agent.Fuel -= moveDistance * agent.FuelConsumptionRate;
 
                     if (agent.Fuel <= 0)

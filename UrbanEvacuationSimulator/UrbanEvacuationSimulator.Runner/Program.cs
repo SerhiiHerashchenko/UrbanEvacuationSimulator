@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 using UrbanEvacuationSimulator.Core.Agent;
 using UrbanEvacuationSimulator.Core.Engines;
 using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.GraphStructures;
 using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
 using UrbanEvacuationSimulator.Core.MapParsers;
+using UrbanEvacuationSimulator.Core.Metrics;
 using UrbanEvacuationSimulator.Core.PathFinder;
 
 namespace UrbanEvacuationSimulator.Runner;
@@ -38,14 +40,22 @@ public class Program
             return;
         }
 
+        var metricsCollector = new MetricsCollector();
+
+        Stopwatch stopWatch = new Stopwatch();
+        stopWatch.Start();
+
         // Initialize simulation components
         var agents = GenerateAgents(graph, count: 10000);
+        metricsCollector.Collect(MetricType.TotalAgents, agents.Count);
+
         var pathFinder = new AStarPathFinder();
         var engine = new SimulationEngine(graph, agents, pathFinder);
 
         Console.WriteLine($"\nInitialized engine with {agents.Count} agents. Starting simulation loop...");
 
         bool isRunning = true;
+
         while (isRunning)
         {
             engine.Tick();
@@ -62,8 +72,32 @@ public class Program
                 isRunning = false;
             }
         }
+        
+        stopWatch.Stop();
+        TimeSpan ts = stopWatch.Elapsed;
 
-        PrintMetrics(engine.CurrentTick, agents);
+        var evacuatedAgentsList = agents.Where(a => a.State == AgentState.Evacuated).ToList();
+        var deadVehicleAgentsList = agents.Where(a => a.State == AgentState.DeadVehicle).ToList();
+
+        var runId = Guid.NewGuid();
+        metricsCollector.Collect(MetricType.RunId, runId.GetHashCode());
+        metricsCollector.Collect(MetricType.TotalSimulationTimeSpentMilliseconds, ts.TotalMilliseconds);
+        metricsCollector.Collect(MetricType.TotalTicks, engine.CurrentTick);
+
+        metricsCollector.Collect(MetricType.EvacuatedCount, evacuatedAgentsList.Count);
+        metricsCollector.Collect(MetricType.DeadVehicleCount, deadVehicleAgentsList.Count);
+        metricsCollector.Collect(MetricType.PathfindingFailureCount, agents.Count(a => a.State == AgentState.PathNotFound));
+
+        metricsCollector.Collect(MetricType.SurvivalRate, (double)evacuatedAgentsList.Count / agents.Count * 100);
+
+        metricsCollector.Collect(MetricType.AverageEvacuatedDistance, evacuatedAgentsList.Average(a => a.TotalPassedDistance));
+        metricsCollector.Collect(MetricType.AverageEvacuatedNodesPassed, evacuatedAgentsList.Average(a => a.TotalNodesPassed));
+        metricsCollector.Collect(MetricType.AverageDeadVehicleDistance, deadVehicleAgentsList.Average(a => a.TotalPassedDistance));
+        metricsCollector.Collect(MetricType.AverageDeadVehicleNodesPassed, deadVehicleAgentsList.Average(a => a.TotalNodesPassed));
+        metricsCollector.Collect(MetricType.AverageEvacuatedEdgeLength, evacuatedAgentsList.Average(a => a.TotalPassedDistance / a.TotalNodesPassed));
+        metricsCollector.Collect(MetricType.AverageDeadVehicleEdgeLength, deadVehicleAgentsList.Average(a => a.TotalPassedDistance / a.TotalNodesPassed));
+
+        metricsCollector.PrintMetricsToConsole();
     }
 
     private static IReadOnlyList<Agent> GenerateAgents(Graph graph, int count)
@@ -90,22 +124,5 @@ public class Program
         }
 
         return agents.AsReadOnly();
-    }
-
-    private static void PrintMetrics(int totalTicks, IReadOnlyList<Agent> agents)
-    {
-        int evacuated = agents.Count(a => a.State == AgentState.Evacuated);
-        int deadVehicles = agents.Count(a => a.State == AgentState.DeadVehicle);
-        int pathfindingFailures = agents.Count(a => a.State == AgentState.PathNotFound);
-        double survivalRate = (double)evacuated / agents.Count * 100;
-
-        Console.WriteLine("\n--- SIMULATION RESULTS ---");
-        Console.WriteLine($"T_max (Clearance Time): {totalTicks} ticks");
-        Console.WriteLine($"Total Agents:         {agents.Count}");
-        Console.WriteLine($"Evacuated:            {evacuated}");
-        Console.WriteLine($"Dead Vehicles:        {deadVehicles}");
-        Console.WriteLine($"Pathfinding Failures: {pathfindingFailures}");
-        Console.WriteLine($"S_rate (Survival %):  {survivalRate:F2}%");
-        Console.WriteLine("--------------------------");
     }
 }
