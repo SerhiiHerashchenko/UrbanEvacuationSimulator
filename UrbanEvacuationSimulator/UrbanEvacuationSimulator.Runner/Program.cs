@@ -56,9 +56,11 @@ public class Program
 
         bool isRunning = true;
 
+        using var telemetry = new TelemetryExporter("simulation_trace.csv");
         while (isRunning)
         {
             engine.Tick();
+            telemetry.ExportTick(engine.CurrentTick, agents);
 
             int activeAgents = agents.Count(a => a.State == AgentState.Idle || a.State == AgentState.Moving);
             

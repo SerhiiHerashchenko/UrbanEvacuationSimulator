@@ -49,8 +49,8 @@ public class Graph
             }
 
             bool isOneWay = way.Tags != null && 
-                            way.Tags.TryGetValue("oneway", out var onewayValue) && 
-                            (onewayValue == "yes" || onewayValue == "true" || onewayValue == "1");
+                way.Tags.TryGetValue("oneway", out var onewayValue) && 
+                (onewayValue == "yes" || onewayValue == "true" || onewayValue == "1");
 
             for (int i = 0; i < way.Nodes.Count - 1; i++)
             {
