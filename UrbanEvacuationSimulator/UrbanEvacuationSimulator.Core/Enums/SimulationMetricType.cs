@@ -1,6 +1,6 @@
 namespace UrbanEvacuationSimulator.Core.Enums;
 
-public enum MetricType
+public enum SimulationMetricType
 {
     //General metrics
     RunId,
@@ -13,12 +13,4 @@ public enum MetricType
     DeadVehicleCount,
     PathfindingFailureCount,
     SurvivalRate,
-
-    //Average metrics
-    AverageEvacuatedDistance,
-    AverageDeadVehicleDistance,
-    AverageEvacuatedNodesPassed,
-    AverageDeadVehicleNodesPassed,
-    AverageEvacuatedEdgeLength,
-    AverageDeadVehicleEdgeLength
 }

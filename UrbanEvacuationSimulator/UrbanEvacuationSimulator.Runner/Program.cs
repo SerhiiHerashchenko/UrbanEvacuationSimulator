@@ -47,7 +47,7 @@ public class Program
 
         // Initialize simulation components
         var agents = GenerateAgents(graph, count: 10000);
-        metricsCollector.Collect(MetricType.TotalAgents, agents.Count);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalAgents, agents.Count);
 
         var pathFinder = new AStarPathFinder();
         var engine = new SimulationEngine(graph, agents, pathFinder);
@@ -82,23 +82,23 @@ public class Program
         var deadVehicleAgentsList = agents.Where(a => a.State == AgentState.DeadVehicle).ToList();
 
         var runId = Guid.NewGuid();
-        metricsCollector.Collect(MetricType.RunId, runId.GetHashCode());
-        metricsCollector.Collect(MetricType.TotalSimulationTimeSpentMilliseconds, ts.TotalMilliseconds);
-        metricsCollector.Collect(MetricType.TotalTicks, engine.CurrentTick);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.RunId,
+            runId.GetHashCode());
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalSimulationTimeSpentMilliseconds,
+            ts.TotalMilliseconds);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalTicks,
+            engine.CurrentTick);
 
-        metricsCollector.Collect(MetricType.EvacuatedCount, evacuatedAgentsList.Count);
-        metricsCollector.Collect(MetricType.DeadVehicleCount, deadVehicleAgentsList.Count);
-        metricsCollector.Collect(MetricType.PathfindingFailureCount, agents.Count(a => a.State == AgentState.PathNotFound));
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.EvacuatedCount,
+            evacuatedAgentsList.Count);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.DeadVehicleCount,
+            deadVehicleAgentsList.Count);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.PathfindingFailureCount,
+            agents.Count(a => a.State == AgentState.PathNotFound));
 
-        metricsCollector.Collect(MetricType.SurvivalRate, (double)evacuatedAgentsList.Count / agents.Count * 100);
-
-        metricsCollector.Collect(MetricType.AverageEvacuatedDistance, evacuatedAgentsList.Average(a => a.TotalPassedDistance));
-        metricsCollector.Collect(MetricType.AverageEvacuatedNodesPassed, evacuatedAgentsList.Average(a => a.TotalNodesPassed));
-        metricsCollector.Collect(MetricType.AverageDeadVehicleDistance, deadVehicleAgentsList.Average(a => a.TotalPassedDistance));
-        metricsCollector.Collect(MetricType.AverageDeadVehicleNodesPassed, deadVehicleAgentsList.Average(a => a.TotalNodesPassed));
-        metricsCollector.Collect(MetricType.AverageEvacuatedEdgeLength, evacuatedAgentsList.Average(a => a.TotalPassedDistance / a.TotalNodesPassed));
-        metricsCollector.Collect(MetricType.AverageDeadVehicleEdgeLength, deadVehicleAgentsList.Average(a => a.TotalPassedDistance / a.TotalNodesPassed));
-
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.SurvivalRate,
+            (double)evacuatedAgentsList.Count / agents.Count * 100);
+            
         metricsCollector.PrintMetricsToConsole();
     }
 

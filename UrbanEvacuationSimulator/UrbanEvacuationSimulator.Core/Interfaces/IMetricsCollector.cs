@@ -4,5 +4,6 @@ namespace UrbanEvacuationSimulator.Core.Interfaces;
 
 public interface IMetricsCollector
 {
-    void Collect(MetricType metricType, double value);
+    void CollectSimulationMetric(SimulationMetricType metricType, double value);
+    void CollectAgentMetric(AgentMetricType metricType, int tickNumber, double value);
 }
