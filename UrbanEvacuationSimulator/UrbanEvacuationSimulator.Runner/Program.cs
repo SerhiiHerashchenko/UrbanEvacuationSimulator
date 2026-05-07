@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
-using UrbanEvacuationSimulator.Core.Agent;
+using UrbanEvacuationSimulator.Core.AgentStructure;
 using UrbanEvacuationSimulator.Core.Engines;
 using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.GraphStructures;
@@ -46,7 +46,7 @@ public class Program
         stopWatch.Start();
 
         // Initialize simulation components
-        var agents = GenerateAgents(graph, count: 10000);
+        var agents = GenerateAgents(graph, count: 1000);
         metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalAgents, agents.Count);
 
         var pathFinder = new AStarPathFinder();
@@ -99,6 +99,7 @@ public class Program
         metricsCollector.CollectSimulationMetric(SimulationMetricType.SurvivalRate,
             (double)evacuatedAgentsList.Count / agents.Count * 100);
             
+        telemetry.ExportDatasets(agents, graph);
         metricsCollector.PrintMetricsToConsole();
     }
 

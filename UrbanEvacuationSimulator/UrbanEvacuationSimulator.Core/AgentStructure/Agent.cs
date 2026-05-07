@@ -1,7 +1,7 @@
 ﻿using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
 
-namespace UrbanEvacuationSimulator.Core.Agent;
+namespace UrbanEvacuationSimulator.Core.AgentStructure;
 
 public class Agent
 {
@@ -20,6 +20,11 @@ public class Agent
 
     public double TotalPassedDistance { get; set; }
     public int TotalNodesPassed { get; set; }
+    public int PathCalculationsCount { get; set; } = 0;
+
+    public double InitialDistance { get; set; }
+    public double InitialFuel { get; set; }
+    public int TicksInCongestion { get; set; }
 
     public Agent(int id, Node startNode, Node targetNode, double fuel, double speed)
     {
@@ -30,5 +35,7 @@ public class Agent
         Speed = speed;
         TotalPassedDistance = 0;
         TotalNodesPassed = 0;
+        InitialFuel = fuel;
+        InitialDistance = startNode.GetDistance(targetNode);
     }
 }

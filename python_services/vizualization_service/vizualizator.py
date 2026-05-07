@@ -26,7 +26,7 @@ def create_animation(csv_file, output_html):
     print(f"Всего уникальных тиков в файле: {len(unique_ticks)} (от {unique_ticks[0]} до {unique_ticks[-1]})")
 
     # Берем каждый 10-й кадр (если тиков мало, берем каждый 2-й или 1-й)
-    step = max(1, len(unique_ticks) // 550)  # Стараемся оставить около 50 кадров для плавной анимации
+    step = max(1, len(unique_ticks) // 750)  # Стараемся оставить около 50 кадров для плавной анимации
     ticks_to_keep = unique_ticks[::step]
 
     df = df[df['Tick'].isin(ticks_to_keep)]

@@ -2,7 +2,7 @@
 import requests
 
 def fetch_roads():
-    area_name = "Арабкир, Ереван"
+    area_name = "Малиновский, Одесса"
     print(f"Ищем район: {area_name}...")
 
     # 1. Получаем ID района через Nominatim API
