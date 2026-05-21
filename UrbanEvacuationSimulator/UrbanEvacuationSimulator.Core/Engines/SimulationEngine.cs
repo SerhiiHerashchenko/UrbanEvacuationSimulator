@@ -41,7 +41,9 @@ public class SimulationEngine : ISimulationEngine
             var agent = _activeAgents[i];
             bool pathJustCalculated = false;
 
-            if ((agent.State == AgentState.Idle || agent.State == AgentState.Moving) && agent.CurrentPath.Count == 0)
+            if ((agent.State == AgentState.Idle || agent.State == AgentState.Moving) && 
+                agent.CurrentEdge == null && 
+agent.CurrentPath.Count == 0)
             {
                 var path = _pathFinder.FindPath(_graph, agent.CurrentNode, agent.TargetNode, _heuristic);
                 if (path.Count > 0)
