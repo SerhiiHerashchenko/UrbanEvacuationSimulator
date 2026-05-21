@@ -56,7 +56,7 @@ public class Program
 
         bool isRunning = true;
 
-        var telemetry = new TelemetryExporter("..\\..\\simulation_trace.csv");
+        var telemetry = new TelemetryExporter("..\\..\\artifacts\\datasets\\simulation_trace.csv");
         while (isRunning)
         {
             engine.Tick();

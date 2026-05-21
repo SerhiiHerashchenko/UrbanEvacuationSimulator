@@ -39,7 +39,7 @@ public class TelemetryExporter : IDisposable
 
         var validAgents = agents.Where(a => a.State != AgentState.PathNotFound).ToList();
 
-        using (var writer = new StreamWriter("..\\..\\agents_dataset.csv"))
+        using (var writer = new StreamWriter("..\\..\\artifacts\\datasets\\agents_dataset.csv"))
         {
             writer.WriteLine("AgentId,State,InitialFuel,InitialDistance,FuelConsumptionRate,TotalPassedDistance,TotalNodesPassed,PathCalculationsCount,TicksInCongestion,CongestionRate");
             foreach (var a in validAgents)
@@ -58,7 +58,7 @@ public class TelemetryExporter : IDisposable
             }
         }
 
-        using (var writer = new StreamWriter("..\\..\\edges_dataset.csv"))
+        using (var writer = new StreamWriter("..\\..\\artifacts\\datasets\\edges_dataset.csv"))
         {
             writer.WriteLine("EdgeId,SourceLat,SourceLon,TargetLat,TargetLon,Length,Capacity,MaxUtilization,CongestionDurationTicks,TotalAgentsPassed,DeadVehiclesCount");
             foreach (var e in graph.Edges)
