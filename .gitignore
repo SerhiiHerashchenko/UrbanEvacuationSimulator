@@ -38,3 +38,4 @@ desktop.ini
 .env.local
 appsettings.Development.json
 secrets.json
+/artifacts/
