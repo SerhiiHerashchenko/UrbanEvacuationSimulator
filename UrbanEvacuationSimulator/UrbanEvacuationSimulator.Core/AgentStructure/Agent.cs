@@ -24,7 +24,9 @@ public class Agent
 
     public double InitialDistance { get; set; }
     public double InitialFuel { get; set; }
+    public int TotalTicks { get; set; }
     public int TicksInCongestion { get; set; }
+    public int PathRecalculationCooldown { get; set; } = 0;
 
     public Agent(int id, Node startNode, Node targetNode, double fuel, double speed)
     {

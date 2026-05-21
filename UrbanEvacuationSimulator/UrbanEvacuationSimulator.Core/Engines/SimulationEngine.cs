@@ -41,6 +41,11 @@ public class SimulationEngine : ISimulationEngine
             var agent = _activeAgents[i];
             bool pathJustCalculated = false;
 
+            if (agent.PathRecalculationCooldown > 0)
+            {
+                agent.PathRecalculationCooldown--;
+            }
+
             if ((agent.State == AgentState.Idle || agent.State == AgentState.Moving) && 
                 agent.CurrentEdge == null && 
 agent.CurrentPath.Count == 0)
@@ -68,9 +73,10 @@ agent.CurrentPath.Count == 0)
                 {
                     var nextEdge = agent.CurrentPath.Peek();
 
-                    if (!pathJustCalculated && nextEdge.CurrentWeight > nextEdge.Length * 3.0)
+                    if (!pathJustCalculated && agent.PathRecalculationCooldown == 0 && nextEdge.CurrentWeight > nextEdge.Length * 3.0)
                     {
                         agent.CurrentPath.Clear();
+                        agent.PathRecalculationCooldown = 50;
                         continue; 
                     }
 
@@ -92,6 +98,7 @@ agent.CurrentPath.Count == 0)
 
                     agent.DistanceOnCurrentEdge += actualSpeed;
                     agent.TotalPassedDistance += actualSpeed;
+                    agent.TotalTicks++;
                     
                     agent.Fuel -= actualSpeed * agent.FuelConsumptionRate; 
 
@@ -108,7 +115,7 @@ agent.CurrentPath.Count == 0)
                     if (agent.DistanceOnCurrentEdge >= agent.CurrentEdge.Length)
                     {
                         agent.CurrentEdge.ActiveAgentsCount--; 
-                        agent.CurrentEdge.TotalAgentsPassed++; // АНАЛИТИКА: Агент успешно покинул ребро
+                        agent.CurrentEdge.TotalAgentsPassed++;
                         agent.CurrentNode = agent.CurrentEdge.Target;
                         agent.CurrentEdge = null;
 
