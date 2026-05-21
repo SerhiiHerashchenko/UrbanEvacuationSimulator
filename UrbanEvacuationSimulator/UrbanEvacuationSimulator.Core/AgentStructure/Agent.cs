@@ -26,6 +26,9 @@ public class Agent
     public double InitialFuel { get; set; }
     public int TotalTicks { get; set; }
     public int TicksInCongestion { get; set; }
+    public double CongestionRate => TotalTicks == 0 ? 0 : (double)TicksInCongestion / TotalTicks;
+    public int? EvacuationTick { get; set; }
+
     public int PathRecalculationCooldown { get; set; } = 0;
 
     public Agent(int id, Node startNode, Node targetNode, double fuel, double speed)
@@ -37,6 +40,8 @@ public class Agent
         Speed = speed;
         TotalPassedDistance = 0;
         TotalNodesPassed = 0;
+        TotalTicks = 0;
+        TicksInCongestion = 0;
         InitialFuel = fuel;
         InitialDistance = startNode.GetDistance(targetNode);
     }

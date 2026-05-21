@@ -48,7 +48,7 @@ public class SimulationEngine : ISimulationEngine
 
             if ((agent.State == AgentState.Idle || agent.State == AgentState.Moving) && 
                 agent.CurrentEdge == null && 
-agent.CurrentPath.Count == 0)
+                agent.CurrentPath.Count == 0)
             {
                 var path = _pathFinder.FindPath(_graph, agent.CurrentNode, agent.TargetNode, _heuristic);
                 if (path.Count > 0)
@@ -99,7 +99,7 @@ agent.CurrentPath.Count == 0)
                     agent.DistanceOnCurrentEdge += actualSpeed;
                     agent.TotalPassedDistance += actualSpeed;
                     agent.TotalTicks++;
-                    
+
                     agent.Fuel -= actualSpeed * agent.FuelConsumptionRate; 
 
                     if (agent.Fuel <= 0)
@@ -122,6 +122,7 @@ agent.CurrentPath.Count == 0)
                         if (agent.CurrentNode.Id == agent.TargetNode.Id)
                         {
                             agent.State = AgentState.Evacuated;
+                            agent.EvacuationTick = CurrentTick;
                             agent.CurrentPath.Clear();
                         }
                     }

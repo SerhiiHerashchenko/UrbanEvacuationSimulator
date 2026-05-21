@@ -13,4 +13,5 @@ public enum SimulationMetricType
     DeadVehicleCount,
     PathfindingFailureCount,
     SurvivalRate,
+    T99ClearanceTime,
 }

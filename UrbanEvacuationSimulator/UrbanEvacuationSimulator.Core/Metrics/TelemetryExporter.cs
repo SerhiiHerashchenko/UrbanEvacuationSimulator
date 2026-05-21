@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using UrbanEvacuationSimulator.Core.AgentStructure;
+using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.GraphStructures;
 
 namespace UrbanEvacuationSimulator.Core.Metrics;
@@ -36,26 +37,28 @@ public class TelemetryExporter : IDisposable
     {
         Console.WriteLine("\nExporting ML Datasets...");
 
-        using (var writer = new StreamWriter("agents_dataset.csv"))
+        var validAgents = agents.Where(a => a.State != AgentState.PathNotFound).ToList();
+
+        using (var writer = new StreamWriter("..\\..\\agents_dataset.csv"))
         {
-            writer.WriteLine("AgentId,State,InitialFuel,InitialDistance,Speed,FuelConsumptionRate,TotalPassedDistance,TotalNodesPassed,PathCalculationsCount,TicksInCongestion");
-            foreach (var a in agents)
+            writer.WriteLine("AgentId,State,InitialFuel,InitialDistance,FuelConsumptionRate,TotalPassedDistance,TotalNodesPassed,PathCalculationsCount,TicksInCongestion,CongestionRate");
+            foreach (var a in validAgents)
             {
-                writer.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0},{1},{2:F6},{3:F6},{4:F6},{5:F6},{6:F6},{7},{8},{9}", 
+                writer.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0},{1},{2:F6},{3:F6},{4:F6},{5:F6},{6},{7},{8},{9:F6}", 
                     a.Id, 
                     a.State, 
                     a.InitialFuel, 
                     a.InitialDistance, 
-                    a.Speed, 
                     a.FuelConsumptionRate, 
                     a.TotalPassedDistance, 
                     a.TotalNodesPassed, 
                     a.PathCalculationsCount, 
-                    a.TicksInCongestion));
+                    a.TicksInCongestion,
+                    a.CongestionRate));
             }
         }
 
-        using (var writer = new StreamWriter("edges_dataset.csv"))
+        using (var writer = new StreamWriter("..\\..\\edges_dataset.csv"))
         {
             writer.WriteLine("EdgeId,SourceLat,SourceLon,TargetLat,TargetLon,Length,Capacity,MaxUtilization,CongestionDurationTicks,TotalAgentsPassed,DeadVehiclesCount");
             foreach (var e in graph.Edges)

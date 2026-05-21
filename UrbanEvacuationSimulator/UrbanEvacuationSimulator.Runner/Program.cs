@@ -56,7 +56,7 @@ public class Program
 
         bool isRunning = true;
 
-        using var telemetry = new TelemetryExporter("simulation_trace.csv");
+        var telemetry = new TelemetryExporter("..\\..\\simulation_trace.csv");
         while (isRunning)
         {
             engine.Tick();
@@ -98,6 +98,16 @@ public class Program
 
         metricsCollector.CollectSimulationMetric(SimulationMetricType.SurvivalRate,
             (double)evacuatedAgentsList.Count / agents.Count * 100);
+
+        if (evacuatedAgentsList.Any())
+        {
+            var sortedEvacuated = evacuatedAgentsList.OrderBy(a => a.EvacuationTick).ToList();
+            int t99Index = (int)Math.Ceiling(sortedEvacuated.Count * 0.99) - 1;
+            t99Index = Math.Max(0, t99Index);
+            
+            int t99Tick = sortedEvacuated[t99Index].EvacuationTick ?? engine.CurrentTick;
+            metricsCollector.CollectSimulationMetric(SimulationMetricType.T99ClearanceTime, t99Tick);
+        }
             
         telemetry.ExportDatasets(agents, graph);
         metricsCollector.PrintMetricsToConsole();
