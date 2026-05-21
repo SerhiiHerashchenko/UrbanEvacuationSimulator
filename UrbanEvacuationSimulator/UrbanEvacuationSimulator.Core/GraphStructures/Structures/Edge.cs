@@ -31,7 +31,8 @@ public class Edge
         //5.0 - average space occupied by one agent on the edge, this is an arbitrary value that can be adjusted based on the desired level of congestion sensitivity
         double effectiveCapacity = Math.Max(1.0, Length * Capacity / 5.0);
         
-        double density = ActiveAgentsCount / effectiveCapacity;
+        double totalOccupancy = ActiveAgentsCount + DeadVehiclesCount; 
+        double density = totalOccupancy / effectiveCapacity;
 
         if (density > MaxUtilization) MaxUtilization = density;
 
@@ -45,7 +46,9 @@ public class Edge
     public double GetSpeedFactor()
     {
         double effectiveCapacity = Math.Max(1.0, Length * Capacity / 5.0);
-        double density = ActiveAgentsCount / effectiveCapacity;
+
+        double totalOccupancy = ActiveAgentsCount + DeadVehiclesCount; 
+        double density = totalOccupancy / effectiveCapacity;
         
         return 1.0 / (1.0 + density * 9.0); 
     }
