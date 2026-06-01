@@ -68,14 +68,13 @@ public class SimulationEngine : ISimulationEngine
 
             if (agent.State == AgentState.Moving)
             {
-                agent.Fuel -= 0.5; 
-
                 if (agent.CurrentEdge == null && agent.CurrentPath.Count > 0)
                 {
                     var nextEdge = agent.CurrentPath.Peek();
 
-                    if (!pathJustCalculated && agent.PathRecalculationCooldown == 0 && nextEdge.CurrentWeight > nextEdge.Length * 3.0)
+                    if (!pathJustCalculated && agent.PathRecalculationCooldown == 0 && nextEdge.IsCongested())
                     {
+                        agent.Fuel -= agent.IdleFuelConsumptionRate; 
                         agent.CurrentPath.Clear();
                         agent.PathRecalculationCooldown = AgentConstants.DEFAULT_PATH_RECALCULATION_COOLDOWN;
                         continue; 
@@ -89,10 +88,9 @@ public class SimulationEngine : ISimulationEngine
 
                 if (agent.CurrentEdge != null)
                 {
-                    double speedFactor = agent.CurrentEdge.GetSpeedFactor();
-                    double actualSpeed = agent.Speed * speedFactor;
+                    double actualSpeed = agent.Speed * agent.CurrentEdge.GetSpeedFactor();
 
-                    if (speedFactor < 0.5) 
+                    if (agent.CurrentEdge.IsCongested())
                     {
                         agent.TicksInCongestion++;
                     }
