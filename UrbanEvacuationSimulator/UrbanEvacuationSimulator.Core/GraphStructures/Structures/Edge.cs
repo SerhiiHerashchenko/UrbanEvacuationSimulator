@@ -30,11 +30,7 @@ public class Edge
 
     public void UpdateWeight()
     {
-        //5.0 - average space occupied by one agent on the edge, this is an arbitrary value that can be adjusted based on the desired level of congestion sensitivity
-        double effectiveCapacity = Math.Max(1.0, Length * Capacity / 5.0);
-        
-        double totalOccupancy = ActiveAgentsCount + DeadVehiclesCount; 
-        double density = totalOccupancy / effectiveCapacity;
+        double density = GetDensity();
 
         if (density > MaxUtilization) MaxUtilization = density;
 
@@ -46,12 +42,15 @@ public class Edge
         CurrentWeight = Length * (1.0 + density * SimulationConstants.DENSITY_CONGESTION_WEIGHT_MULTIPLIER) + deadVehiclePenalty;
     }
 
-    public double GetSpeedFactor()
+    public double GetSpeedFactor() =>
+        1.0 / (1.0 + GetDensity() * SimulationConstants.DENSITY_CONGESTION_SPEED_MULTIPLIER); 
+
+    public bool IsCongested() => GetDensity() > SimulationConstants.CONGESTION_THRESHOLD;
+
+    private double GetDensity()
     {
         double effectiveCapacity = Math.Max(1.0, Length * Capacity / SimulationConstants.DEFAULT_CAR_LENGTH_METRES);
         double totalOccupancy = ActiveAgentsCount + DeadVehiclesCount; 
-        double density = totalOccupancy / effectiveCapacity;
-        
-        return 1.0 / (1.0 + density * 9.0); 
+        return totalOccupancy / effectiveCapacity;
     }
 }
