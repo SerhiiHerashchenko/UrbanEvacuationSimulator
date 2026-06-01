@@ -1,5 +1,6 @@
 ﻿using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+using UrbanEvacuationSimulator.Core.Constants;
 
 namespace UrbanEvacuationSimulator.Core.AgentStructure;
 
@@ -11,7 +12,8 @@ public class Agent
     
     public double Fuel { get; set; }
     public double Speed { get; set; }
-    public double FuelConsumptionRate { get; set; } = 1.0;
+    public double FuelConsumptionRate { get; set; } = AgentConstants.DEFAULT_FUEL_CONSUMPTION_RATE;
+    public double IdleFuelConsumptionRate { get; set; } = AgentConstants.DEFAULT_IDLE_FUEL_CONSUMPTION_RATE;
 
     public AgentState State { get; set; } = AgentState.Idle;
     public Queue<Edge> CurrentPath { get; set; } = new();

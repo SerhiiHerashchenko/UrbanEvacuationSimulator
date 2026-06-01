@@ -1,4 +1,6 @@
-﻿namespace UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+﻿using UrbanEvacuationSimulator.Core.Constants;
+
+namespace UrbanEvacuationSimulator.Core.GraphStructures.Structures;
 
 public class Edge
 {
@@ -36,17 +38,17 @@ public class Edge
 
         if (density > MaxUtilization) MaxUtilization = density;
 
-        if (density > 0.8) CongestionDurationTicks++;
+        if (density > SimulationConstants.CONGESTION_THRESHOLD) CongestionDurationTicks++;
         
-        double deadVehiclePenalty = DeadVehiclesCount * (Length * 2.0); 
+        double deadVehiclePenalty = DeadVehiclesCount *
+            (Length * SimulationConstants.DEAD_VEHICLE_PENALTY_MULTIPLIER); 
 
-        CurrentWeight = Length * (1.0 + density * 5.0) + deadVehiclePenalty;
+        CurrentWeight = Length * (1.0 + density * SimulationConstants.DENSITY_CONGESTION_WEIGHT_MULTIPLIER) + deadVehiclePenalty;
     }
 
     public double GetSpeedFactor()
     {
-        double effectiveCapacity = Math.Max(1.0, Length * Capacity / 5.0);
-
+        double effectiveCapacity = Math.Max(1.0, Length * Capacity / SimulationConstants.DEFAULT_CAR_LENGTH_METRES);
         double totalOccupancy = ActiveAgentsCount + DeadVehiclesCount; 
         double density = totalOccupancy / effectiveCapacity;
         

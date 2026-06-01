@@ -3,6 +3,7 @@ using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.GraphStructures;
 using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
 using UrbanEvacuationSimulator.Core.Interfaces;
+using UrbanEvacuationSimulator.Core.Constants;
 
 
 namespace UrbanEvacuationSimulator.Core.Engines;
@@ -76,7 +77,7 @@ public class SimulationEngine : ISimulationEngine
                     if (!pathJustCalculated && agent.PathRecalculationCooldown == 0 && nextEdge.CurrentWeight > nextEdge.Length * 3.0)
                     {
                         agent.CurrentPath.Clear();
-                        agent.PathRecalculationCooldown = 50;
+                        agent.PathRecalculationCooldown = AgentConstants.DEFAULT_PATH_RECALCULATION_COOLDOWN;
                         continue; 
                     }
 
