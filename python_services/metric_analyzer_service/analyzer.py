@@ -109,7 +109,7 @@ def analyze_dynamics(trace_file_path):
             plt.plot(state_counts.index, state_counts['DeadVehicle'], label='Dead Vehicles (Failed)', color='#e74c3c', linewidth=2)
             
         if 'Evacuated' in state_counts.columns and 'DeadVehicle' in state_counts.columns:
-            total_resolved = state_counts['Evacuated'] + state_counts['DeadVehicle']
+            total_resolved = state_counts['Evacuated'] + state_counts['DeadVehicle']+ state_counts['Moving']+ state_counts['PathNotFound']
             survival_rate = (state_counts['Evacuated'] / total_resolved.replace(0, 1)) * 100
             
             ax1 = plt.gca()
