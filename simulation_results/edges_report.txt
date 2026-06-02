@@ -1,0 +1,7 @@
+Top-5 Most Problematic Sections (Bottlenecks):
+ EdgeId     Length  MaxUtilization  CongestionDurationTicks  DeadVehiclesCount
+   3294 248.280892        1.832602                     1280                 15
+  20572 316.610612        7.374990                     1256                 14
+  35010 241.687122        0.248255                        0                 13
+   3298 121.481285        3.827750                     1540                 10
+  26071 236.869915        0.548824                        0                 10

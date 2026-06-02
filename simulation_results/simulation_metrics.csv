@@ -1,0 +1,10 @@
+MetricType,Value
+TotalAgents,3000
+RunId,0
+TotalSimulationTimeSpentMilliseconds,83861.0287
+TotalTicks,3352
+EvacuatedCount,2114
+DeadVehicleCount,798
+PathfindingFailureCount,88
+SurvivalRate,70.4666666666667
+T99ClearanceTime,3235
