@@ -1,4 +1,5 @@
-﻿using UrbanEvacuationSimulator.Core.Enums;
+﻿using System.Globalization;
+using UrbanEvacuationSimulator.Core.Enums;
 using UrbanEvacuationSimulator.Core.Interfaces;
 
 namespace UrbanEvacuationSimulator.Core.Metrics;
@@ -32,5 +33,17 @@ public class MetricsCollector: IMetricsCollector
             }
         }
         Console.WriteLine("------------------------------");
+    }
+
+    public void ExportMetricsToCsv(string filePath)
+    {
+        using (var writer = new StreamWriter(filePath))
+        {
+            writer.WriteLine("MetricType,Value");
+            foreach (var metric in _simulationMetrics)
+            {
+                writer.WriteLine(string.Format(CultureInfo.InvariantCulture, $"{metric.Type},{metric.Value}"));
+            }
+        }
     }
 }

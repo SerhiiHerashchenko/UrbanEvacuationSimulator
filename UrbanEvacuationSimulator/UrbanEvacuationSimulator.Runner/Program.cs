@@ -46,7 +46,7 @@ public class Program
         stopWatch.Start();
 
         // Initialize simulation components
-        var agents = GenerateAgents(graph, count: 1000);
+        var agents = GenerateAgents(graph, count: 3000);
         metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalAgents, agents.Count);
 
         var pathFinder = new AStarPathFinder();
@@ -81,7 +81,7 @@ public class Program
         var evacuatedAgentsList = agents.Where(a => a.State == AgentState.Evacuated).ToList();
         var deadVehicleAgentsList = agents.Where(a => a.State == AgentState.DeadVehicle).ToList();
 
-        var runId = Guid.NewGuid();
+        var runId = 0;;
         metricsCollector.CollectSimulationMetric(SimulationMetricType.RunId,
             runId.GetHashCode());
         metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalSimulationTimeSpentMilliseconds,
@@ -110,6 +110,7 @@ public class Program
         }
             
         telemetry.ExportDatasets(agents, graph);
+        metricsCollector.ExportMetricsToCsv("..\\..\\artifacts\\datasets\\simulation_metrics.csv");
         metricsCollector.PrintMetricsToConsole();
     }
 
@@ -130,8 +131,8 @@ public class Program
             }
             
             // Randomize fuel (meters) and speed (m/tick)
-            double fuel = random.Next(2000, 15000); 
-            double speed = random.Next(10, 25);
+            double fuel = random.Next(2000, 30000); 
+            double speed = random.Next(25, 50);
 
             agents.Add(new Agent(i, startNode, targetNode, fuel, speed));
         }

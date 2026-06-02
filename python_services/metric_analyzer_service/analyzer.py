@@ -24,7 +24,7 @@ def analyze_agents(file_path):
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1)
     plt.title('Matrix of Correlations of Agent Features')
     plt.tight_layout()
-    plt.savefig('..\\artifacts\\data_visualizations\\correlation_heatmap.png', dpi=300)
+    plt.savefig('..\\artifacts\\visualizations\\correlation_heatmap.png', dpi=300)
     print("Saved plot: correlation_heatmap.png")
     
     features_model = [f for f in available_features if f != 'IsEvacuated']
@@ -50,7 +50,7 @@ def analyze_agents(file_path):
     plt.xlabel(f'Principal Component 1 ({pca.explained_variance_ratio_[0]*100:.1f}% information)')
     plt.ylabel(f'Principal Component 2 ({pca.explained_variance_ratio_[1]*100:.1f}% information)')
     plt.tight_layout()
-    plt.savefig('..\\artifacts\\data_visualizations\\pca_scatter.png', dpi=300)
+    plt.savefig('..\\artifacts\\visualizations\\pca_scatter.png', dpi=300)
     print("Saved plot: pca_scatter.png")
 
     components_df = pd.DataFrame(pca.components_.T, columns=['PC1', 'PC2'], index=features_model)
@@ -58,7 +58,7 @@ def analyze_agents(file_path):
     sns.heatmap(components_df, annot=True, cmap='coolwarm', center=0)
     plt.title('PCA Eigenvectors: Feature Contributions to PC1 and PC2')
     plt.tight_layout()
-    plt.savefig('..\\artifacts\\data_visualizations\\pca_eigenvectors.png', dpi=300)
+    plt.savefig('..\\artifacts\\visualizations\\pca_eigenvectors.png', dpi=300)
     print("Saved plot: pca_eigenvectors.png")
     print("\n--- Eigenvectors of PCA (That contribute to PC1 and PC2) ---")
     print(components_df)
@@ -76,7 +76,7 @@ def analyze_agents(file_path):
     plt.title('Feature Importance (Random Forest): What contributes most to survival?')
     plt.xlabel('Relative Importance (0.0 - 1.0)')
     plt.tight_layout()
-    plt.savefig('..\\artifacts\\data_visualizations\\feature_importance.png', dpi=300)
+    plt.savefig('..\\artifacts\\visualizations\\feature_importance.png', dpi=300)
     print("Saved plot: feature_importance.png")
     print("\n--- Feature Importance ---")
     print(importance_df.to_string(index=False))
@@ -87,9 +87,13 @@ def analyze_edges(file_path):
     
     bottlenecks = df.sort_values(by=['DeadVehiclesCount', 'CongestionDurationTicks'], ascending=[False, False])
     
-    print("\nTop-5 Most Problematic Sections (Bottlenecks):")
-    print(bottlenecks[['EdgeId', 'Length', 'MaxUtilization', 'CongestionDurationTicks', 'DeadVehiclesCount']].head(5).to_string(index=False))
+    text = "Top-5 Most Problematic Sections (Bottlenecks):\n"
+    text += bottlenecks[['EdgeId', 'Length', 'MaxUtilization', 'CongestionDurationTicks', 'DeadVehiclesCount']].head(5).to_string(index=False)
 
+    with open("..\\artifacts\\reports\\edges_report.txt", "w", encoding="utf-8") as file:
+        file.write(text)
+
+    print(text)
 
 def analyze_dynamics(trace_file_path):
     try:
@@ -129,7 +133,7 @@ def analyze_dynamics(trace_file_path):
         ax1.legend(lines1 + lines2, labels1 + labels2, loc='center right')
         
         plt.tight_layout()
-        plt.savefig('..\\artifacts\\data_visualizations\\mortality_dynamics.png', dpi=300)
+        plt.savefig('..\\artifacts\\visualizations\\mortality_dynamics.png', dpi=300)
         print("Saved plot: mortality_dynamics.png")
         
     except FileNotFoundError:
