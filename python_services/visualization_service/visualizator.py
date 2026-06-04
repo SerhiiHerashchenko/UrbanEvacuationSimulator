@@ -98,4 +98,4 @@ def create_animation(csv_file, output_html):
 
 
 if __name__ == "__main__":
-    create_animation("simulation_trace.csv", "evacuation_map.html")
+    create_animation("..\\artifacts\\datasets\\simulation_trace.csv", "..\\artifacts\\datasets\\evacuation_map.html")
