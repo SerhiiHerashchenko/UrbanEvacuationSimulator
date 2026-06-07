@@ -1,0 +1,1332 @@
+﻿===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Runner\Program.cs =====
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Diagnostics;
+using UrbanEvacuationSimulator.Core.AgentStructure;
+using UrbanEvacuationSimulator.Core.Engines;
+using UrbanEvacuationSimulator.Core.Enums;
+using UrbanEvacuationSimulator.Core.GraphStructures;
+using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+using UrbanEvacuationSimulator.Core.MapParsers;
+using UrbanEvacuationSimulator.Core.Metrics;
+using UrbanEvacuationSimulator.Core.PathFinder;
+
+namespace UrbanEvacuationSimulator.Runner;
+
+public class Program
+{
+    public static void Main(string[] args)
+    {
+        Console.WriteLine("Starting Urban Evacuation Simulator (UES-Sim)...");
+
+        string mapFilePath = args.Length > 0 ? args[0] : "map.json";
+        
+        var mapParser = new JsonMapParser();
+        if (!mapParser.TryParse(mapFilePath, out var responseDto))
+        {
+            Console.WriteLine($"Failed to parse map file: {mapFilePath}");
+            Console.WriteLine("Ensure the JSON map file exists and is correctly formatted.");
+            return;
+        }
+
+        Console.WriteLine($"Map parsed successfully. Loaded {responseDto.Elements.Count} elements.");
+
+        var graph = Graph.CreateGraph(responseDto);
+        Console.WriteLine($"Graph built: {graph.Nodes.Count} nodes, {graph.Edges.Count} edges.");
+
+        if (graph.Nodes.Count < 2)
+        {
+            Console.WriteLine("Graph does not contain enough nodes for simulation.");
+            return;
+        }
+
+        var metricsCollector = new MetricsCollector();
+
+        Stopwatch stopWatch = new Stopwatch();
+        stopWatch.Start();
+
+        // Initialize simulation components
+        var agents = GenerateAgents(graph, count: 3000);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalAgents, agents.Count);
+
+        var pathFinder = new AStarPathFinder();
+        var engine = new SimulationEngine(graph, agents, pathFinder);
+
+        Console.WriteLine($"\nInitialized engine with {agents.Count} agents. Starting simulation loop...");
+
+        bool isRunning = true;
+
+        var telemetry = new TelemetryExporter("..\\..\\artifacts\\datasets\\simulation_trace.csv");
+        while (isRunning)
+        {
+            engine.Tick();
+            telemetry.ExportTick(engine.CurrentTick, agents);
+
+            int activeAgents = agents.Count(a => a.State == AgentState.Idle || a.State == AgentState.Moving);
+            
+            if (engine.CurrentTick % 50 == 0)
+            {
+                Console.WriteLine($"Tick {engine.CurrentTick, 5} | Active Agents: {activeAgents, 4}");
+            }
+
+            if (activeAgents == 0)
+            {
+                isRunning = false;
+            }
+        }
+        
+        stopWatch.Stop();
+        TimeSpan ts = stopWatch.Elapsed;
+
+        var evacuatedAgentsList = agents.Where(a => a.State == AgentState.Evacuated).ToList();
+        var deadVehicleAgentsList = agents.Where(a => a.State == AgentState.DeadVehicle).ToList();
+
+        var runId = 0;;
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.RunId,
+            runId.GetHashCode());
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalSimulationTimeSpentMilliseconds,
+            ts.TotalMilliseconds);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.TotalTicks,
+            engine.CurrentTick);
+
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.EvacuatedCount,
+            evacuatedAgentsList.Count);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.DeadVehicleCount,
+            deadVehicleAgentsList.Count);
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.PathfindingFailureCount,
+            agents.Count(a => a.State == AgentState.PathNotFound));
+
+        metricsCollector.CollectSimulationMetric(SimulationMetricType.SurvivalRate,
+            (double)evacuatedAgentsList.Count / agents.Count * 100);
+
+        if (evacuatedAgentsList.Any())
+        {
+            var sortedEvacuated = evacuatedAgentsList.OrderBy(a => a.EvacuationTick).ToList();
+            int t99Index = (int)Math.Ceiling(sortedEvacuated.Count * 0.99) - 1;
+            t99Index = Math.Max(0, t99Index);
+            
+            int t99Tick = sortedEvacuated[t99Index].EvacuationTick ?? engine.CurrentTick;
+            metricsCollector.CollectSimulationMetric(SimulationMetricType.T99ClearanceTime, t99Tick);
+        }
+            
+        telemetry.ExportDatasets(agents, graph);
+        metricsCollector.ExportMetricsToCsv("..\\..\\artifacts\\datasets\\simulation_metrics.csv");
+        metricsCollector.PrintMetricsToConsole();
+    }
+
+    private static IReadOnlyList<Agent> GenerateAgents(Graph graph, int count)
+    {
+        var agents = new List<Agent>();
+        var random = new Random(42); // Fixed seed for reproducibility
+
+        var targetNode = graph.Nodes[random.Next(graph.Nodes.Count)];
+
+        for (int i = 1; i <= count; i++)
+        {
+            var startNode = graph.Nodes[random.Next(graph.Nodes.Count)];
+
+            while (startNode.Id == targetNode.Id)
+            {
+                startNode = graph.Nodes[random.Next(graph.Nodes.Count)];
+            }
+            
+            // Randomize fuel (meters) and speed (m/tick)
+            double fuel = random.Next(2000, 30000); 
+            double speed = random.Next(25, 50);
+
+            agents.Add(new Agent(i, startNode, targetNode, fuel, speed));
+        }
+
+        return agents.AsReadOnly();
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Runner\Program.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Engines\SimulationEngine.cs =====
+using UrbanEvacuationSimulator.Core.AgentStructure;
+using UrbanEvacuationSimulator.Core.Enums;
+using UrbanEvacuationSimulator.Core.GraphStructures;
+using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+using UrbanEvacuationSimulator.Core.Interfaces;
+using UrbanEvacuationSimulator.Core.Constants;
+
+
+namespace UrbanEvacuationSimulator.Core.Engines;
+
+public class SimulationEngine : ISimulationEngine
+{
+    private readonly Graph _graph;
+    private readonly IReadOnlyList<Agent> _agents;
+    private readonly IPathFinder _pathFinder;
+    private readonly Func<Node, Node, double> _heuristic;
+    private readonly List<Agent> _activeAgents;
+    
+    public int CurrentTick { get; private set; }
+
+    public SimulationEngine(Graph graph, IReadOnlyList<Agent> agents, IPathFinder pathFinder)
+    {
+        _graph = graph;
+        _agents = agents;
+        _pathFinder = pathFinder;
+        _heuristic = (start, target) => start.GetDistance(target);
+        _activeAgents = agents.ToList();
+        CurrentTick = 0;
+    }
+
+    public void Tick()
+    {
+        CurrentTick++;
+
+        foreach (var edge in _graph.Edges)
+        {
+            edge.UpdateWeight();
+        }
+
+        for (int i = _activeAgents.Count - 1; i >= 0; i--)
+        {
+            var agent = _activeAgents[i];
+            bool pathJustCalculated = false;
+
+            if (agent.PathRecalculationCooldown > 0)
+            {
+                agent.PathRecalculationCooldown--;
+            }
+
+            if ((agent.State == AgentState.Idle || agent.State == AgentState.Moving) && 
+                agent.CurrentEdge == null && 
+                agent.CurrentPath.Count == 0)
+            {
+                var path = _pathFinder.FindPath(_graph, agent.CurrentNode, agent.TargetNode, _heuristic);
+                if (path.Count > 0)
+                {
+                    agent.CurrentPath = new Queue<Edge>(path);
+                    agent.State = AgentState.Moving;
+                    agent.PathCalculationsCount++;
+                    pathJustCalculated = true;
+                }
+                else
+                {
+                    agent.State = AgentState.PathNotFound; 
+                    continue; 
+                }
+            }
+
+            if (agent.State == AgentState.Moving)
+            {
+                if (agent.CurrentEdge == null && agent.CurrentPath.Count > 0)
+                {
+                    var nextEdge = agent.CurrentPath.Peek();
+
+                    if (!pathJustCalculated && agent.PathRecalculationCooldown == 0 && nextEdge.IsCongested())
+                    {
+                        agent.Fuel -= agent.IdleFuelConsumptionRate; 
+                        agent.CurrentPath.Clear();
+                        agent.PathRecalculationCooldown = AgentConstants.DEFAULT_PATH_RECALCULATION_COOLDOWN;
+                        continue; 
+                    }
+
+                    agent.CurrentEdge = agent.CurrentPath.Dequeue();
+                    agent.CurrentEdge.ActiveAgentsCount++; 
+                    agent.TotalNodesPassed++;
+                    agent.DistanceOnCurrentEdge = 0;
+                }
+
+                if (agent.CurrentEdge != null)
+                {
+                    double actualSpeed = agent.Speed * agent.CurrentEdge.GetSpeedFactor();
+
+                    if (agent.CurrentEdge.IsCongested())
+                    {
+                        agent.TicksInCongestion++;
+                    }
+
+                    agent.DistanceOnCurrentEdge += actualSpeed;
+                    agent.TotalPassedDistance += actualSpeed;
+                    agent.TotalTicks++;
+
+                    agent.Fuel -= actualSpeed * agent.FuelConsumptionRate; 
+
+                    if (agent.Fuel <= 0)
+                    {
+                        agent.Fuel = 0;
+                        agent.State = AgentState.DeadVehicle;
+                        
+                        agent.CurrentEdge.ActiveAgentsCount--; 
+                        agent.CurrentEdge.DeadVehiclesCount++; 
+                        continue;
+                    }
+
+                    if (agent.DistanceOnCurrentEdge >= agent.CurrentEdge.Length)
+                    {
+                        agent.CurrentEdge.ActiveAgentsCount--; 
+                        agent.CurrentEdge.TotalAgentsPassed++;
+                        agent.CurrentNode = agent.CurrentEdge.Target;
+                        agent.CurrentEdge = null;
+
+                        if (agent.CurrentNode.Id == agent.TargetNode.Id)
+                        {
+                            agent.State = AgentState.Evacuated;
+                            agent.EvacuationTick = CurrentTick;
+                            agent.CurrentPath.Clear();
+                        }
+                    }
+                }
+                else if (agent.Fuel <= 0)
+                {
+                    agent.Fuel = 0;
+                    agent.State = AgentState.DeadVehicle;
+                }
+            }
+
+            if (agent.State == AgentState.Evacuated || 
+                agent.State == AgentState.DeadVehicle || 
+                agent.State == AgentState.PathNotFound)
+            {
+                _activeAgents.RemoveAt(i);
+            }
+        }
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Engines\SimulationEngine.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\ISimulationEngine.cs =====
+namespace UrbanEvacuationSimulator.Core.Interfaces;
+
+public interface ISimulationEngine
+{
+    void Tick();
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\ISimulationEngine.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\IMapParser.cs =====
+using UrbanEvacuationSimulator.Core.DTOs;
+
+namespace UrbanEvacuationSimulator.Core.Interfaces;
+
+public interface IMapParser
+{
+    public bool TryParse(string filePath, out OverpassResponseDto responseDto);
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\IMapParser.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\IMetricsCollector.cs =====
+using UrbanEvacuationSimulator.Core.Enums;
+
+namespace UrbanEvacuationSimulator.Core.Interfaces;
+
+public interface IMetricsCollector
+{
+    void CollectSimulationMetric(SimulationMetricType metricType, double value);
+    void CollectAgentMetric(AgentMetricType metricType, int tickNumber, double value);
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\IMetricsCollector.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\IPathFinder.cs =====
+using UrbanEvacuationSimulator.Core.GraphStructures;
+using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+
+namespace UrbanEvacuationSimulator.Core.Interfaces;
+
+public interface IPathFinder
+{
+    IReadOnlyList<Edge> FindPath(
+        Graph graph,
+        Node start,
+        Node target,
+        Func<Node, Node, double> heuristic);
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Interfaces\IPathFinder.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\MapParsers\JsonMapParser.cs =====
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+using UrbanEvacuationSimulator.Core.DTOs;
+using UrbanEvacuationSimulator.Core.Interfaces;
+
+namespace UrbanEvacuationSimulator.Core.MapParsers;
+
+public class JsonMapParser: IMapParser
+{
+    public bool TryParse(string filePath, out OverpassResponseDto responseDto)
+    {
+        responseDto = null;
+        if (!File.Exists(filePath)) return false;
+
+        try
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                NumberHandling = JsonNumberHandling.AllowReadingFromString
+            };
+
+            using var stream = File.OpenRead(filePath);
+            responseDto = JsonSerializer.Deserialize<OverpassResponseDto>(stream, options);
+            return responseDto?.Elements != null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Parse error: {ex.Message}");
+            return false;
+        }
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\MapParsers\JsonMapParser.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\DTOs\OsmElementDto.cs =====
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+
+namespace UrbanEvacuationSimulator.Core.DTOs;
+
+public class OsmElementDto
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; }
+
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
+
+    [JsonPropertyName("lat")]
+    public double? Lat { get; set; }
+
+    [JsonPropertyName("lon")]
+    public double? Lon { get; set; }
+
+    [JsonPropertyName("nodes")]
+    public List<long> Nodes { get; set; }
+
+    [JsonPropertyName("tags")]
+    public Dictionary<string, string> Tags { get; set; }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\DTOs\OsmElementDto.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\DTOs\OverpassResponseDto.cs =====
+using System;
+using System.Text.Json.Serialization;
+
+namespace UrbanEvacuationSimulator.Core.DTOs;
+
+public class OverpassResponseDto
+{
+    [JsonPropertyName("elements")]
+    public List<OsmElementDto> Elements { get; set; }
+}
+
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\DTOs\OverpassResponseDto.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\GraphStructures\Structures\Edge.cs =====
+using UrbanEvacuationSimulator.Core.Constants;
+
+namespace UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+
+public class Edge
+{
+    public readonly int Id;
+    public Node Source { get; set; }
+    public Node Target { get; set; }
+
+    public double Length { get; set; }
+    public double Capacity { get; set; }
+    public double CurrentWeight { get; set; }
+    public int ActiveAgentsCount { get; set; }
+    public int DeadVehiclesCount { get; set; }
+
+    public double MaxUtilization { get; set; } = 0;
+    public int CongestionDurationTicks { get; set; } = 0;
+    public int TotalAgentsPassed { get; set; } = 0;
+
+    public Edge(int id, Node source, Node target, double length = 0, double capacity = 0)
+    {
+        Id = id;
+        Source = source;
+        Target = target;
+        Length = length;
+        Capacity = capacity;
+        CurrentWeight = length;
+    }
+
+    public void UpdateWeight()
+    {
+        double density = GetDensity();
+
+        if (density > MaxUtilization) MaxUtilization = density;
+
+        if (density > SimulationConstants.CONGESTION_THRESHOLD) CongestionDurationTicks++;
+        
+        double deadVehiclePenalty = DeadVehiclesCount *
+            (Length * SimulationConstants.DEAD_VEHICLE_PENALTY_MULTIPLIER); 
+
+        CurrentWeight = Length * (1.0 + density * SimulationConstants.DENSITY_CONGESTION_WEIGHT_MULTIPLIER) + deadVehiclePenalty;
+    }
+
+    public double GetSpeedFactor() =>
+        1.0 / (1.0 + GetDensity() * SimulationConstants.DENSITY_CONGESTION_SPEED_MULTIPLIER); 
+
+    public bool IsCongested() => GetDensity() > SimulationConstants.CONGESTION_THRESHOLD;
+
+    private double GetDensity()
+    {
+        double effectiveCapacity = Math.Max(1.0, Length * Capacity / SimulationConstants.DEFAULT_CAR_LENGTH_METRES);
+        double totalOccupancy = ActiveAgentsCount + DeadVehiclesCount; 
+        return totalOccupancy / effectiveCapacity;
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\GraphStructures\Structures\Edge.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\GraphStructures\Structures\Node.cs =====
+using UrbanEvacuationSimulator.Core.Constants;
+
+namespace UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+
+public class Node
+{
+    public readonly int Id;
+    public double Lat { get; set; }
+    public double Lon { get; set; }
+
+    public Node(int id, double lat, double lon)
+    {
+        Id = id;
+        Lat = lat;
+        Lon = lon;
+    }
+
+    public double GetDistance(Node target)
+    {
+        var t = Math.PI / 180.0;
+        var d1 = Lat * t;
+        var num1 = Lon * t;
+        var d2 = target.Lat * t;
+        var num2 = target.Lon * t - num1;
+        var d3 = Math.Pow(Math.Sin((d2 - d1) / 2.0), 2.0) + Math.Cos(d1) * Math.Cos(d2) * Math.Pow(Math.Sin(num2 / 2.0), 2.0);
+        
+        return GraphConstants.EARTH_RADIUS_METRES * (2.0 * Math.Atan2(Math.Sqrt(d3), Math.Sqrt(1.0 - d3)));
+    }
+
+    public override int GetHashCode() => HashCode.Combine(Lat, Lon);
+    public override bool Equals(object? obj) => obj is Node n && n.Lat == Lat && n.Lon == Lon;
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\GraphStructures\Structures\Node.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\GraphStructures\Graph.cs =====
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using UrbanEvacuationSimulator.Core.DTOs;
+using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+
+namespace UrbanEvacuationSimulator.Core.GraphStructures;
+
+public class Graph
+{
+    public IReadOnlyList<Node> Nodes { get; }
+    public IReadOnlyList<Edge> Edges { get; }
+    public List<List<Edge>> AdjacencyList { get; }
+
+    public Graph(IReadOnlyList<Node> nodes, IReadOnlyList<Edge> edges, List<List<Edge>> adjacencyList)
+    {
+        Nodes = nodes;
+        Edges = edges;
+        AdjacencyList = adjacencyList;
+    }
+
+    public static Graph CreateGraph(OverpassResponseDto data)
+    {
+        var nodeMap = new Dictionary<long, Node>();
+        var edges = new List<Edge>();
+        var adjacencyList = new List<List<Edge>>();
+
+        int internalNodeId = 0;
+        int edgeIdCounter = 0;
+
+        foreach (var el in data.Elements.Where(e => e.Type == "node"))
+        {
+            if (el.Lat.HasValue && el.Lon.HasValue)
+            {
+                var node = new Node(internalNodeId++, el.Lat.Value, el.Lon.Value);
+                nodeMap[el.Id] = node;
+                adjacencyList.Add(new List<Edge>());
+            }
+        }
+
+        foreach (var way in data.Elements.Where(e => e.Type == "way"))
+        {
+            if (way.Nodes == null || way.Nodes.Count < 2) continue;
+
+            double capacity = 1.0;
+            if (way.Tags != null && way.Tags.TryGetValue("lanes", out var lanesStr))
+            {
+                double.TryParse(lanesStr, NumberStyles.Any, CultureInfo.InvariantCulture, out capacity);
+            }
+
+            bool isOneWay = way.Tags != null && 
+                way.Tags.TryGetValue("oneway", out var onewayValue) && 
+                (onewayValue == "yes" || onewayValue == "true" || onewayValue == "1");
+
+            for (int i = 0; i < way.Nodes.Count - 1; i++)
+            {
+                long osmSourceId = way.Nodes[i];
+                long osmTargetId = way.Nodes[i + 1];
+
+                if (!nodeMap.TryGetValue(osmSourceId, out var sourceNode) || 
+                    !nodeMap.TryGetValue(osmTargetId, out var targetNode))
+                {
+                    continue;
+                }
+
+                double length = sourceNode.GetDistance(targetNode);
+
+                var forwardEdge = new Edge(edgeIdCounter++, sourceNode, targetNode, length, capacity);
+                edges.Add(forwardEdge);
+                adjacencyList[sourceNode.Id].Add(forwardEdge);
+
+                if (!isOneWay)
+                {
+                    var reverseEdge = new Edge(edgeIdCounter++, targetNode, sourceNode, length, capacity);
+                    edges.Add(reverseEdge);
+                    adjacencyList[targetNode.Id].Add(reverseEdge);
+                }
+            }
+        }
+
+        var connectedNodes = nodeMap.Values.Where(n => adjacencyList[n.Id].Count > 0).ToList();
+
+        return new Graph(connectedNodes, edges, adjacencyList);
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\GraphStructures\Graph.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\PathFinder\AStarPathFinder.cs =====
+using UrbanEvacuationSimulator.Core.GraphStructures;
+using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+using UrbanEvacuationSimulator.Core.Interfaces;
+
+namespace UrbanEvacuationSimulator.Core.PathFinder;
+
+public class AStarPathFinder : IPathFinder
+{
+    public IReadOnlyList<Edge> FindPath(Graph graph, Node start, Node target, Func<Node, Node, double> heuristic)
+    {
+        var openSet = new PriorityQueue<Node, double>();
+        var cameFrom = new Dictionary<int, Edge>();
+        var gScore = new Dictionary<int, double>();
+
+        gScore[start.Id] = 0;
+        openSet.Enqueue(start, heuristic(start, target));
+
+        while (openSet.Count > 0)
+        {
+            var current = openSet.Dequeue();
+
+            if (current.Id == target.Id)
+            {
+                return ReconstructPath(cameFrom, current);
+            }
+
+            var neighbors = graph.AdjacencyList[current.Id];
+            if (neighbors == null)
+            {
+                continue;
+            }
+
+            foreach (var edge in neighbors)
+            {
+                var neighbor = edge.Target;
+                
+                double currentGScore = gScore.TryGetValue(current.Id, out var cg) ? cg : double.PositiveInfinity;
+                double tentativeGScore = currentGScore + edge.CurrentWeight;
+
+                double neighborGScore = gScore.TryGetValue(neighbor.Id, out var ng) ? ng : double.PositiveInfinity;
+
+                if (tentativeGScore < neighborGScore)
+                {
+                    cameFrom[neighbor.Id] = edge;
+                    gScore[neighbor.Id] = tentativeGScore;
+                    openSet.Enqueue(neighbor, tentativeGScore + heuristic(neighbor, target));
+                }
+            }
+        }
+        return Array.Empty<Edge>();
+    }
+
+    private static IReadOnlyList<Edge> ReconstructPath(Dictionary<int, Edge> cameFrom, Node current)
+    {
+        var path = new List<Edge>();
+        var currentNodeId = current.Id;
+
+        while (cameFrom.TryGetValue(currentNodeId, out var edge))
+        {
+            path.Add(edge);
+            currentNodeId = edge.Source.Id;
+        }
+
+        path.Reverse();
+        return path.AsReadOnly();
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\PathFinder\AStarPathFinder.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\AgentStructure\Agent.cs =====
+using UrbanEvacuationSimulator.Core.Enums;
+using UrbanEvacuationSimulator.Core.GraphStructures.Structures;
+using UrbanEvacuationSimulator.Core.Constants;
+
+namespace UrbanEvacuationSimulator.Core.AgentStructure;
+
+public class Agent
+{
+    public int Id { get; set; }
+    public Node CurrentNode { get; set; }
+    public Node TargetNode { get; set; }
+    
+    public double Fuel { get; set; }
+    public double Speed { get; set; }
+    public double FuelConsumptionRate { get; set; } = AgentConstants.DEFAULT_FUEL_CONSUMPTION_RATE;
+    public double IdleFuelConsumptionRate { get; set; } = AgentConstants.DEFAULT_IDLE_FUEL_CONSUMPTION_RATE;
+
+    public AgentState State { get; set; } = AgentState.Idle;
+    public Queue<Edge> CurrentPath { get; set; } = new();
+    public Edge? CurrentEdge { get; set; }
+    public double DistanceOnCurrentEdge { get; set; }
+
+    public double TotalPassedDistance { get; set; }
+    public int TotalNodesPassed { get; set; }
+    public int PathCalculationsCount { get; set; } = 0;
+
+    public double InitialDistance { get; set; }
+    public double InitialFuel { get; set; }
+    public int TotalTicks { get; set; }
+    public int TicksInCongestion { get; set; }
+    public double CongestionRate => TotalTicks == 0 ? 0 : (double)TicksInCongestion / TotalTicks;
+    public int? EvacuationTick { get; set; }
+
+    public int PathRecalculationCooldown { get; set; } = 0;
+
+    public Agent(int id, Node startNode, Node targetNode, double fuel, double speed)
+    {
+        Id = id;
+        CurrentNode = startNode;
+        TargetNode = targetNode;
+        Fuel = fuel;
+        Speed = speed;
+        TotalPassedDistance = 0;
+        TotalNodesPassed = 0;
+        TotalTicks = 0;
+        TicksInCongestion = 0;
+        InitialFuel = fuel;
+        InitialDistance = startNode.GetDistance(targetNode);
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\AgentStructure\Agent.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Metrics\MetricsCollector.cs =====
+using System.Globalization;
+using UrbanEvacuationSimulator.Core.Enums;
+using UrbanEvacuationSimulator.Core.Interfaces;
+
+namespace UrbanEvacuationSimulator.Core.Metrics;
+
+public class MetricsCollector: IMetricsCollector
+{
+    private readonly List<(SimulationMetricType Type, double Value)> _simulationMetrics = new();
+    private readonly List<(AgentMetricType type, int tickNumber, double value)> _agentMetrics = new();
+    //determine if we need to store agent metrics in a different way, maybe we can store them in a list of lists, where each list corresponds to a tick number, and each element in the list corresponds to a metric type, and the value is the metric value for that tick number and metric type
+    public void CollectSimulationMetric(SimulationMetricType metricType, double value) =>
+        _simulationMetrics.Add((metricType, value));
+
+    public void CollectAgentMetric(AgentMetricType metricType, int tickNumber, double value) =>
+        _agentMetrics.Add((metricType, tickNumber, value));
+
+    public List<double> GetMetric(SimulationMetricType metricType) =>
+        _simulationMetrics.Where(m => m.Type == metricType).Select(m => m.Value).ToList();
+
+    public void PrintMetricsToConsole()
+    {
+        Console.WriteLine("----- Simulation Metrics -----");
+        foreach (var metric in _simulationMetrics)
+        {
+            if (metric.Type == SimulationMetricType.SurvivalRate)
+            {
+                Console.WriteLine($"{metric.Type}: {metric.Value:F2}%");
+            }
+            else
+            {
+                Console.WriteLine($"{metric.Type}: {metric.Value}");
+            }
+        }
+        Console.WriteLine("------------------------------");
+    }
+
+    public void ExportMetricsToCsv(string filePath)
+    {
+        using (var writer = new StreamWriter(filePath))
+        {
+            writer.WriteLine("MetricType,Value");
+            foreach (var metric in _simulationMetrics)
+            {
+                writer.WriteLine(string.Format(CultureInfo.InvariantCulture, $"{metric.Type},{metric.Value}"));
+            }
+        }
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Metrics\MetricsCollector.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Metrics\TelemetryExporter.cs =====
+using System.Globalization;
+using System.IO;
+using UrbanEvacuationSimulator.Core.AgentStructure;
+using UrbanEvacuationSimulator.Core.Enums;
+using UrbanEvacuationSimulator.Core.GraphStructures;
+
+namespace UrbanEvacuationSimulator.Core.Metrics;
+
+public class TelemetryExporter : IDisposable
+{
+    private readonly StreamWriter _writer;
+
+    public TelemetryExporter(string filePath)
+    {
+        _writer = new StreamWriter(filePath);
+        _writer.WriteLine("Tick,AgentId,Lat,Lon,State"); 
+    }
+
+    public void ExportTick(int tick, IEnumerable<Agent> agents)
+    {
+        // Optimize: export every 5th tick
+        //if (tick % 5 != 0) return;
+
+        foreach (var agent in agents)
+        {
+            _writer.WriteLine(string.Format(CultureInfo.InvariantCulture, 
+                "{0},{1},{2:F6},{3:F6},{4}", 
+                tick, 
+                agent.Id, 
+                agent.CurrentNode.Lat, 
+                agent.CurrentNode.Lon, 
+                agent.State));
+        }
+    }
+
+    public void ExportDatasets(IReadOnlyList<Agent> agents, Graph graph)
+    {
+        Console.WriteLine("\nExporting ML Datasets...");
+
+        var validAgents = agents.Where(a => a.State != AgentState.PathNotFound).ToList();
+
+        using (var writer = new StreamWriter("..\\..\\artifacts\\datasets\\agents_dataset.csv"))
+        {
+            writer.WriteLine("AgentId,State,InitialFuel,InitialDistance,FuelConsumptionRate,TotalPassedDistance,TotalNodesPassed,PathCalculationsCount,TicksInCongestion,CongestionRate");
+            foreach (var a in validAgents)
+            {
+                writer.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0},{1},{2:F6},{3:F6},{4:F6},{5:F6},{6},{7},{8},{9:F6}", 
+                    a.Id, 
+                    a.State, 
+                    a.InitialFuel, 
+                    a.InitialDistance, 
+                    a.FuelConsumptionRate, 
+                    a.TotalPassedDistance, 
+                    a.TotalNodesPassed, 
+                    a.PathCalculationsCount, 
+                    a.TicksInCongestion,
+                    a.CongestionRate));
+            }
+        }
+
+        using (var writer = new StreamWriter("..\\..\\artifacts\\datasets\\edges_dataset.csv"))
+        {
+            writer.WriteLine("EdgeId,SourceLat,SourceLon,TargetLat,TargetLon,Length,Capacity,MaxUtilization,CongestionDurationTicks,TotalAgentsPassed,DeadVehiclesCount");
+            foreach (var e in graph.Edges)
+            {
+                if (e.MaxUtilization > 0 || e.DeadVehiclesCount > 0)
+                {
+                    writer.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0},{1:F6},{2:F6},{3:F6},{4:F6},{5:F6},{6},{7:F6},{8},{9},{10}", 
+                        e.Id, 
+                        e.Source.Lat, 
+                        e.Source.Lon, 
+                        e.Target.Lat, 
+                        e.Target.Lon, 
+                        e.Length, 
+                        e.Capacity, 
+                        e.MaxUtilization, 
+                        e.CongestionDurationTicks, 
+                        e.TotalAgentsPassed, 
+                        e.DeadVehiclesCount));
+                }
+            }
+        }
+        Console.WriteLine("Datasets exported: agents_dataset.csv, edges_dataset.csv");
+    }
+
+    public void Dispose()
+    {
+        _writer.Dispose();
+    }
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Metrics\TelemetryExporter.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Enums\SimulationMetricType.cs =====
+namespace UrbanEvacuationSimulator.Core.Enums;
+
+public enum SimulationMetricType
+{
+    //General metrics
+    RunId,
+    TotalAgents,
+    TotalSimulationTimeSpentMilliseconds,
+    TotalTicks,
+
+    //Count metrics
+    EvacuatedCount,
+    DeadVehicleCount,
+    PathfindingFailureCount,
+    SurvivalRate,
+    T99ClearanceTime,
+}
+
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Enums\SimulationMetricType.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Enums\AgentMetricType.cs =====
+namespace UrbanEvacuationSimulator.Core.Enums;
+
+public enum AgentMetricType
+{
+
+}
+
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Enums\AgentMetricType.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Enums\AgentState.cs =====
+namespace UrbanEvacuationSimulator.Core.Enums;
+
+public enum AgentState
+{
+    Idle,
+    Moving,
+    DeadVehicle,
+    Evacuated,
+    PathNotFound
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Enums\AgentState.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Constants\SimulationConstants.cs =====
+namespace UrbanEvacuationSimulator.Core.Constants;
+
+public class SimulationConstants
+{
+    public const double DEFAULT_CAR_LENGTH_METRES = 5.0;
+    public const double CONGESTION_THRESHOLD = 0.8;
+    public const double DEAD_VEHICLE_PENALTY_MULTIPLIER = 2.0;
+    public const double DENSITY_CONGESTION_WEIGHT_MULTIPLIER = 5.0;
+    public const double DENSITY_CONGESTION_SPEED_MULTIPLIER = 9.0;
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Constants\SimulationConstants.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Constants\AgentConstants.cs =====
+namespace UrbanEvacuationSimulator.Core.Constants;
+
+public class AgentConstants
+{
+    public const double DEFAULT_FUEL_CONSUMPTION_RATE = 1.0;
+    public const double DEFAULT_IDLE_FUEL_CONSUMPTION_RATE = 0.1;
+    public const int DEFAULT_PATH_RECALCULATION_COOLDOWN = 50;
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Constants\AgentConstants.cs =====
+
+===== FILE START: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Constants\GraphConstants.cs =====
+namespace UrbanEvacuationSimulator.Core.Constants;
+
+public class GraphConstants
+{
+    public const double EARTH_RADIUS_METRES = 6376500.0;
+}
+===== FILE END: \UrbanEvacuationSimulator\UrbanEvacuationSimulator.Core\Constants\GraphConstants.cs =====
+
+===== FILE START: \python_services\map_loading_service\loader.py =====
+import json
+import requests
+
+def fetch_roads():
+    area_name = "Малиновский, Одесса"
+    print(f"Ищем район: {area_name}...")
+
+    nom_url = "https://nominatim.openstreetmap.org/search"
+    nom_params = {
+        "q": area_name,
+        "format": "json",
+        "limit": 1
+    }
+
+    headers = {"User-Agent": "UrbanEvacuationDataFetcher/1.0"}
+
+    nom_response = requests.get(nom_url, params=nom_params, headers=headers).json()
+
+    if not nom_response:
+        print("Area not found.")
+        return
+
+    area_data = nom_response[0]
+    osm_id = int(area_data["osm_id"])
+    osm_type = area_data["osm_type"]
+
+    if osm_type == "relation":
+        overpass_area_id = osm_id + 3600000000
+    elif osm_type == "way":
+        overpass_area_id = osm_id + 2400000000
+    else:
+        print("Unsupported object type for area.")
+        return
+
+    overpass_url = "https://overpass-api.de/api/interpreter" 
+    overpass_query = f"""
+    [out:json];
+    area({overpass_area_id})->.searchArea;
+    way["highway"](area.searchArea);
+    (._;>;);
+    out body;
+    """
+
+    print("Map Topology downloading...(it can take about a minute)")
+
+    response = requests.post(overpass_url, data={"data": overpass_query}, headers=headers)
+
+    if response.status_code != 200:
+        print(f"Server Error (Overpass): {response.status_code}")
+        print("Server Response:", response.text)
+        return
+
+    data = response.json()
+    elements = data.get("elements", [])
+
+    nodes_count = sum(1 for e in elements if e["type"] == "node")
+    ways_count = sum(1 for e in elements if e["type"] == "way")
+
+    print(f"Found objects: {len(elements)} (Nodes: {nodes_count}, Roads: {ways_count}).")
+
+    output_filename = "map.json"
+
+    with open(output_filename, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    print(f"Done! The complete connected graph has been successfully saved to {output_filename}")
+
+
+if __name__ == "__main__":
+    fetch_roads()
+===== FILE END: \python_services\map_loading_service\loader.py =====
+
+===== FILE START: \python_services\visualization_service\visualizator.py =====
+import random
+from datetime import datetime, timedelta
+
+import pandas as pd
+import folium
+from folium.plugins import TimestampedGeoJson
+
+
+def create_animation(csv_file, output_html):
+    print(f"Loading data from {csv_file}...")
+
+    df = pd.read_csv(csv_file)
+    df = df.dropna(subset=['Lat', 'Lon', 'Tick', 'AgentId'])
+
+    if df.empty:
+        print("Error: CSV file is empty or missing required columns.")
+        return
+
+    step = 2
+
+    unique_ticks = sorted(df['Tick'].unique())
+    step = max(1, step)
+    df = df[df['Tick'].isin(unique_ticks[::step])]
+
+    unique_agents = df['AgentId'].unique()
+    if len(unique_agents) > 1000:
+        agents_to_keep = random.sample(list(unique_agents), 1000)
+        df = df[df['AgentId'].isin(agents_to_keep)]
+
+    if df.empty:
+        print("Error: No data left after filtering.")
+        return
+
+    start_time = datetime(2026, 4, 24, 8, 0, 0)
+    df['time'] = df['Tick'].apply(
+        lambda x: (start_time + timedelta(seconds=int(x))).isoformat()
+    )
+
+    color_map = {
+        'Idle': '#808080',
+        'Moving': '#3388ff',
+        'DeadVehicle': '#ff0000',
+        'Evacuated': '#00ff00',
+        'PathNotFound': '#ffa500'
+    }
+
+    print("Generating GeoJSON frames...")
+    features = []
+
+    for _, row in df.iterrows():
+        state = str(row['State']).strip()
+        
+        feature = {
+            'type': 'Feature',
+            'geometry': {
+                'type': 'Point',
+                'coordinates': [float(row['Lon']), float(row['Lat'])]
+            },
+            'properties': {
+                'time': row['time'],
+                'icon': 'circle',
+                'iconstyle': {
+                    'fillColor': color_map.get(state, '#ffffff'),
+                    'fillOpacity': 0.8,
+                    'stroke': 'false',
+                    'radius': 4
+                },
+                'popup': f"Agent: {row['AgentId']}<br>State: {state}"
+            }
+        }
+        features.append(feature)
+
+    print("Generating HTML map...")
+    center_lat = df['Lat'].mean()
+    center_lon = df['Lon'].mean()
+
+    m = folium.Map(
+        location=[center_lat, center_lon], 
+        zoom_start=14, 
+        tiles='CartoDB dark_matter'
+    )
+
+    TimestampedGeoJson(
+        {'type': 'FeatureCollection', 'features': features},
+        period=f'PT{step}S',
+        duration=f'PT{step}S',
+        add_last_point=False,
+        auto_play=True,
+        loop=True,
+        max_speed=5,
+        loop_button=True,
+        time_slider_drag_update=True,
+        transition_time=50
+    ).add_to(m)
+
+    m.save(output_html)
+    print(f"Success! Map saved as: {output_html}")
+
+
+if __name__ == "__main__":
+    create_animation("..\\artifacts\\datasets\\simulation_trace.csv", "..\\artifacts\\datasets\\evacuation_map.html")
+===== FILE END: \python_services\visualization_service\visualizator.py =====
+
+===== FILE START: \python_services\metric_analyzer_service\analyzer.py =====
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+
+def analyze_agents(file_path):
+    df = pd.read_csv(file_path)
+    
+    df = df[df['State'].isin(['Evacuated', 'DeadVehicle'])].copy()
+    
+    df['IsEvacuated'] = df['State'].apply(lambda x: 1 if x == 'Evacuated' else 0)
+    
+    features_corr = ['IsEvacuated', 'InitialFuel', 'InitialDistance', 
+                     'TotalPassedDistance', 'TotalNodesPassed', 
+                     'PathCalculationsCount', 'TicksInCongestion', 'CongestionRate']
+    
+    available_features = [f for f in features_corr if f in df.columns]
+    
+    corr_matrix = df[available_features].corr()
+    
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1)
+    plt.title('Matrix of Correlations of Agent Features')
+    plt.tight_layout()
+    plt.savefig('..\\artifacts\\visualizations\\correlation_heatmap.png', dpi=300)
+    print("Saved plot: correlation_heatmap.png")
+    
+    features_model = [f for f in available_features if f != 'IsEvacuated']
+    
+    X = df[features_model]
+    y = df['IsEvacuated']
+    
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    pca = PCA(n_components=2)
+    components = pca.fit_transform(X_scaled)
+    
+    df_pca = pd.DataFrame(data=components, columns=['PC1', 'PC2'])
+    df_pca['State'] = df['State'].values
+    
+    plt.figure(figsize=(10, 6))
+    sns.scatterplot(x='PC1', y='PC2', hue='State', 
+                    palette={'Evacuated': '#2ecc71', 'DeadVehicle': '#e74c3c'}, 
+                    data=df_pca, alpha=0.7, edgecolor=None)
+    
+    plt.title('PCA: Distribution of Agents (2 Principal Components)')
+    plt.xlabel(f'Principal Component 1 ({pca.explained_variance_ratio_[0]*100:.1f}% information)')
+    plt.ylabel(f'Principal Component 2 ({pca.explained_variance_ratio_[1]*100:.1f}% information)')
+    plt.tight_layout()
+    plt.savefig('..\\artifacts\\visualizations\\pca_scatter.png', dpi=300)
+    print("Saved plot: pca_scatter.png")
+
+    components_df = pd.DataFrame(pca.components_.T, columns=['PC1', 'PC2'], index=features_model)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(components_df, annot=True, cmap='coolwarm', center=0)
+    plt.title('PCA Eigenvectors: Feature Contributions to PC1 and PC2')
+    plt.tight_layout()
+    plt.savefig('..\\artifacts\\visualizations\\pca_eigenvectors.png', dpi=300)
+    print("Saved plot: pca_eigenvectors.png")
+    print("\n--- Eigenvectors of PCA (That contribute to PC1 and PC2) ---")
+    print(components_df)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_scaled, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+    rf_model.fit(X_train, y_train)
+
+    y_pred = rf_model.predict(X_test)
+    y_proba = rf_model.predict_proba(X_test)[:, 1]
+
+    print("\n--- Quality Metrics of Random Forest Model (on Test Set) ---")
+
+    report = classification_report(y_test, y_pred, target_names=['DeadVehicle', 'Evacuated'])
+    roc_auc = roc_auc_score(y_test, y_proba)
+
+    final_report = f"Classification Report:\n{report}\nROC-AUC Score: {roc_auc:.4f}"
+
+    print(report)
+    print(f"ROC-AUC Score: {roc_auc:.4f}\n")
+
+    with open("..\\artifacts\\reports\\rf_training_report.txt", "w", encoding="utf-8") as file:
+        file.write(final_report)
+
+    plt.figure(figsize=(6, 5))
+    cm = confusion_matrix(y_test, y_pred)
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=['DeadVehicle', 'Evacuated'], 
+                yticklabels=['DeadVehicle', 'Evacuated'])
+    plt.title('Confusion Matrix (Random Forest)')
+    plt.ylabel('True Class')
+    plt.xlabel('Predicted Class')
+    plt.tight_layout()
+    plt.savefig('..\\artifacts\\visualizations\\confusion_matrix.png', dpi=300)
+    print("Saved plot: confusion_matrix.png")
+
+    importance_df = pd.DataFrame({
+        'Feature': features_model,
+        'Importance': rf_model.feature_importances_
+    }).sort_values(by='Importance', ascending=False)
+
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='Importance', y='Feature', data=importance_df, palette='viridis')
+    plt.title('Feature Importance (Random Forest): What contributes most to survival?')
+    plt.xlabel('Relative Importance (0.0 - 1.0)')
+    plt.tight_layout()
+    plt.savefig('..\\artifacts\\visualizations\\feature_importance.png', dpi=300)
+    print("Saved plot: feature_importance.png")
+    print("\n--- Feature Importance ---")
+    print(importance_df.to_string(index=False))
+
+    # rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+    # rf_model.fit(X_scaled, y)
+
+    # importance_df = pd.DataFrame({
+    #     'Feature': features_model,
+    #     'Importance': rf_model.feature_importances_
+    # }).sort_values(by='Importance', ascending=False)
+
+    # plt.figure(figsize=(10, 6))
+    # sns.barplot(x='Importance', y='Feature', data=importance_df, palette='viridis')
+    # plt.title('Feature Importance (Random Forest): What contributes most to survival?')
+    # plt.xlabel('Relative Importance (0.0 - 1.0)')
+    # plt.tight_layout()
+    # plt.savefig('..\\artifacts\\visualizations\\feature_importance.png', dpi=300)
+    # print("Saved plot: feature_importance.png")
+    # print("\n--- Feature Importance ---")
+    # print(importance_df.to_string(index=False))
+
+
+def analyze_edges(file_path):
+    df = pd.read_csv(file_path)
+    
+    bottlenecks = df.sort_values(by=['DeadVehiclesCount', 'CongestionDurationTicks'], ascending=[False, False])
+    
+    text = "Top-5 Most Problematic Sections (Bottlenecks):\n"
+    text += bottlenecks[['EdgeId', 'Length', 'MaxUtilization', 'CongestionDurationTicks', 'DeadVehiclesCount']].head(5).to_string(index=False)
+
+    with open("..\\artifacts\\reports\\edges_report.txt", "w", encoding="utf-8") as file:
+        file.write(text)
+
+    print(text)
+
+def analyze_dynamics(trace_file_path):
+    try:
+        df = pd.read_csv(trace_file_path)
+
+        if 'Tick' not in df.columns or 'State' not in df.columns:
+            print(f"Format {trace_file_path} does not contain columns 'Tick' or 'State'. Dynamics plot skipped.")
+            return
+
+        state_counts = df.groupby(['Tick', 'State']).size().unstack(fill_value=0)
+        
+        plt.figure(figsize=(12, 6))
+        
+        if 'Evacuated' in state_counts.columns:
+            plt.plot(state_counts.index, state_counts['Evacuated'], label='Evacuated (Successful)', color='#2ecc71', linewidth=2)
+        if 'DeadVehicle' in state_counts.columns:
+            plt.plot(state_counts.index, state_counts['DeadVehicle'], label='Dead Vehicles (Failed)', color='#e74c3c', linewidth=2)
+            
+        if 'Evacuated' in state_counts.columns and 'DeadVehicle' in state_counts.columns:
+            total_resolved = state_counts['Evacuated'] + state_counts['DeadVehicle']+ state_counts['Moving']+ state_counts['PathNotFound']
+            survival_rate = (state_counts['Evacuated'] / total_resolved.replace(0, 1)) * 100
+            
+            ax1 = plt.gca()
+            ax2 = ax1.twinx()
+            ax2.plot(state_counts.index, survival_rate, label='Survival Rate (%)', color='#f39c12', linestyle='--')
+            ax2.set_ylabel('Survival Rate (%)', color='#f39c12')
+            ax2.tick_params(axis='y', labelcolor='#f39c12')
+            ax2.set_ylim(-5, 105)
+
+        plt.title('Mortality Dynamics & Survival Rate (Dynamics over Time)')
+        plt.xlabel('Time (Ticks)')
+        ax1.set_ylabel('Number of Agents')
+        ax1.grid(True, linestyle='--', alpha=0.6)
+        
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels() if 'ax2' in locals() else ([], [])
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+        
+        plt.tight_layout()
+        plt.savefig('..\\artifacts\\visualizations\\mortality_dynamics.png', dpi=300)
+        print("Saved plot: mortality_dynamics.png")
+        
+    except FileNotFoundError:
+        print(f"\nFile {trace_file_path} not found. A log of the streaming telemetry is required for dynamics analysis.")
+
+
+if __name__ == "__main__":
+    print("Starting the analytics pipeline for Urban Evacuation Simulator...\n")
+    print("--- Agent Analysis ---")
+    analyze_agents('..\\artifacts\\datasets\\agents_dataset.csv')
+    
+    print("\n--- Edge Analysis ---")
+    analyze_edges('..\\artifacts\\datasets\\edges_dataset.csv')
+    
+    print("\n--- Simulation Dynamics ---")
+    analyze_dynamics('..\\artifacts\\datasets\\simulation_trace.csv')
+===== FILE END: \python_services\metric_analyzer_service\analyzer.py =====
+

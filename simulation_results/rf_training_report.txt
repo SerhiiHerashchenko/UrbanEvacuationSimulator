@@ -1,11 +1,11 @@
 Classification Report:
               precision    recall  f1-score   support
 
- DeadVehicle       0.97      0.93      0.95       160
-   Evacuated       0.97      0.99      0.98       423
+ DeadVehicle       0.96      0.94      0.95       181
+   Evacuated       0.98      0.98      0.98       402
 
     accuracy                           0.97       583
    macro avg       0.97      0.96      0.97       583
 weighted avg       0.97      0.97      0.97       583
 
-ROC-AUC Score: 0.9969
+ROC-AUC Score: 0.9967

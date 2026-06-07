@@ -36,8 +36,7 @@ public class Edge
 
         if (density > SimulationConstants.CONGESTION_THRESHOLD) CongestionDurationTicks++;
         
-        double deadVehiclePenalty = DeadVehiclesCount *
-            (Length * SimulationConstants.DEAD_VEHICLE_PENALTY_MULTIPLIER); 
+        double deadVehiclePenalty = DeadVehiclesCount * SimulationConstants.DEAD_VEHICLE_PENALTY_MULTIPLIER; 
 
         CurrentWeight = Length * (1.0 + density * SimulationConstants.DENSITY_CONGESTION_WEIGHT_MULTIPLIER) + deadVehiclePenalty;
     }
@@ -50,7 +49,7 @@ public class Edge
     private double GetDensity()
     {
         double effectiveCapacity = Math.Max(1.0, Length * Capacity / SimulationConstants.DEFAULT_CAR_LENGTH_METRES);
-        double totalOccupancy = ActiveAgentsCount + DeadVehiclesCount; 
+        double totalOccupancy = (ActiveAgentsCount + DeadVehiclesCount) * SimulationConstants.DEFAULT_CAR_LENGTH_METRES; 
         return totalOccupancy / effectiveCapacity;
     }
 }
