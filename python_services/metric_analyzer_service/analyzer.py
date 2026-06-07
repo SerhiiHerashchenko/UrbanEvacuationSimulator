@@ -182,7 +182,7 @@ def analyze_dynamics(trace_file_path):
         
         lines1, labels1 = ax1.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels() if 'ax2' in locals() else ([], [])
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='center right')
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
         
         plt.tight_layout()
         plt.savefig('..\\artifacts\\visualizations\\mortality_dynamics.png', dpi=300)
