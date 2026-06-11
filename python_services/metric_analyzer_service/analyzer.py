@@ -24,7 +24,7 @@ def analyze_agents(file_path):
     
     plt.figure(figsize=(10, 8))
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1)
-    plt.title('Matrix of Correlations of Agent Features')
+    plt.title('Кореляцiйна матриця ознак агентiв')
     plt.tight_layout()
     plt.savefig('..\\artifacts\\visualizations\\correlation_heatmap.png', dpi=300)
     print("Saved plot: correlation_heatmap.png")
@@ -48,9 +48,9 @@ def analyze_agents(file_path):
                     palette={'Evacuated': '#2ecc71', 'DeadVehicle': '#e74c3c'}, 
                     data=df_pca, alpha=0.7, edgecolor=None)
     
-    plt.title('PCA: Distribution of Agents (2 Principal Components)')
-    plt.xlabel(f'Principal Component 1 ({pca.explained_variance_ratio_[0]*100:.1f}% information)')
-    plt.ylabel(f'Principal Component 2 ({pca.explained_variance_ratio_[1]*100:.1f}% information)')
+    plt.title('PCA:Розподiл агентiв за двома головними компонентами')
+    plt.xlabel(f'Головна компонента 1 ({pca.explained_variance_ratio_[0]*100:.1f}% iнформацiї)')
+    plt.ylabel(f'Головна компонента 2 ({pca.explained_variance_ratio_[1]*100:.1f}% iнформацiї)')
     plt.tight_layout()
     plt.savefig('..\\artifacts\\visualizations\\pca_scatter.png', dpi=300)
     print("Saved plot: pca_scatter.png")
@@ -58,7 +58,7 @@ def analyze_agents(file_path):
     components_df = pd.DataFrame(pca.components_.T, columns=['PC1', 'PC2'], index=features_model)
     plt.figure(figsize=(8, 6))
     sns.heatmap(components_df, annot=True, cmap='coolwarm', center=0)
-    plt.title('PCA Eigenvectors: Feature Contributions to PC1 and PC2')
+    plt.title('PCA власні вектори: Вклад ознак у головні компоненти')
     plt.tight_layout()
     plt.savefig('..\\artifacts\\visualizations\\pca_eigenvectors.png', dpi=300)
     print("Saved plot: pca_eigenvectors.png")
@@ -80,7 +80,7 @@ def analyze_agents(file_path):
     report = classification_report(y_test, y_pred, target_names=['DeadVehicle', 'Evacuated'])
     roc_auc = roc_auc_score(y_test, y_proba)
 
-    final_report = f"Classification Report:\n{report}\nROC-AUC Score: {roc_auc:.4f}"
+    final_report = f"Звіт класифікації:\n{report}\nROC-AUC Score: {roc_auc:.4f}"
 
     print(report)
     print(f"ROC-AUC Score: {roc_auc:.4f}\n")
@@ -107,31 +107,13 @@ def analyze_agents(file_path):
 
     plt.figure(figsize=(10, 6))
     sns.barplot(x='Importance', y='Feature', data=importance_df, palette='viridis')
-    plt.title('Feature Importance (Random Forest): What contributes most to survival?')
-    plt.xlabel('Relative Importance (0.0 - 1.0)')
+    plt.title('Feature Importance (Random Forest): Які ознаки найбільше впливають на виживання?')
+    plt.xlabel('Вiдносна важливість (0.0 - 1.0)')
     plt.tight_layout()
     plt.savefig('..\\artifacts\\visualizations\\feature_importance.png', dpi=300)
     print("Saved plot: feature_importance.png")
     print("\n--- Feature Importance ---")
     print(importance_df.to_string(index=False))
-
-    # rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
-    # rf_model.fit(X_scaled, y)
-
-    # importance_df = pd.DataFrame({
-    #     'Feature': features_model,
-    #     'Importance': rf_model.feature_importances_
-    # }).sort_values(by='Importance', ascending=False)
-
-    # plt.figure(figsize=(10, 6))
-    # sns.barplot(x='Importance', y='Feature', data=importance_df, palette='viridis')
-    # plt.title('Feature Importance (Random Forest): What contributes most to survival?')
-    # plt.xlabel('Relative Importance (0.0 - 1.0)')
-    # plt.tight_layout()
-    # plt.savefig('..\\artifacts\\visualizations\\feature_importance.png', dpi=300)
-    # print("Saved plot: feature_importance.png")
-    # print("\n--- Feature Importance ---")
-    # print(importance_df.to_string(index=False))
 
 
 def analyze_edges(file_path):
@@ -139,7 +121,7 @@ def analyze_edges(file_path):
     
     bottlenecks = df.sort_values(by=['DeadVehiclesCount', 'CongestionDurationTicks'], ascending=[False, False])
     
-    text = "Top-5 Most Problematic Sections (Bottlenecks):\n"
+    text = "Top-5 Найбільш проблематичних доріг (Bottlenecks):\n"
     text += bottlenecks[['EdgeId', 'Length', 'MaxUtilization', 'CongestionDurationTicks', 'DeadVehiclesCount']].head(5).to_string(index=False)
 
     with open("..\\artifacts\\reports\\edges_report.txt", "w", encoding="utf-8") as file:
@@ -170,19 +152,19 @@ def analyze_dynamics(trace_file_path):
             
             ax1 = plt.gca()
             ax2 = ax1.twinx()
-            ax2.plot(state_counts.index, survival_rate, label='Survival Rate (%)', color='#f39c12', linestyle='--')
-            ax2.set_ylabel('Survival Rate (%)', color='#f39c12')
+            ax2.plot(state_counts.index, survival_rate, label='Рiвень виживання (%)', color='#f39c12', linestyle='--')
+            ax2.set_ylabel('Рiвень виживання (%)', color='#f39c12')
             ax2.tick_params(axis='y', labelcolor='#f39c12')
             ax2.set_ylim(-5, 105)
 
-        plt.title('Mortality Dynamics & Survival Rate (Dynamics over Time)')
-        plt.xlabel('Time (Ticks)')
-        ax1.set_ylabel('Number of Agents')
+        plt.title('Динаміка евакуації та смертності протягом часу симуляції')
+        plt.xlabel('Час (Ticks)')
+        ax1.set_ylabel('Кількість агентів')
         ax1.grid(True, linestyle='--', alpha=0.6)
         
         lines1, labels1 = ax1.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels() if 'ax2' in locals() else ([], [])
-        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
         
         plt.tight_layout()
         plt.savefig('..\\artifacts\\visualizations\\mortality_dynamics.png', dpi=300)
